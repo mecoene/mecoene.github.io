@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Publications — Your Name</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,300&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-inner">
+      <a class="nav-brand" href="index.html">Your Name</a>
+      <button class="nav-toggle" id="navToggle">☰</button>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="index.html">About</a></li>
+        <li><a href="publications.html" class="active">Publications</a></li>
+        <li><a href="cv.html">CV</a></li>
+        <li><a href="blog.html">Blog</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main class="container">
+    <div class="page-hero">
+      <h1>Publications</h1>
+      <p>* denotes equal contribution. See also: <a href="https://scholar.google.com/citations?user=XXXXX" target="_blank">Google Scholar</a></p>
+    </div>
+
+    <!-- 2026 -->
+    <div class="year-group">
+      <p class="year-label">2026</p>
+      <div class="pubs-section" style="padding-top:0.75rem;">
+        <ol class="pub-list">
+          <li class="pub-item">
+            <div class="pub-preview"><div class="pub-preview-placeholder">📄</div></div>
+            <div class="pub-info">
+              <p class="pub-title">Your 2026 Paper Title: Exploring Something New</p>
+              <p class="pub-authors"><strong>Your Name</strong>*, Co-author A*, Co-author B</p>
+              <p class="pub-venue"><em>Conference Name (CONF) — Main Track Oral</em>, 2026</p>
+              <div class="pub-links">
+                <a href="#" class="pub-link">HTML</a>
+                <a href="#" class="pub-link">PDF</a>
+                <a href="#" class="pub-link">Code</a>
+              </div>
+            </div>
+          </li>
+          <li class="pub-item">
+            <div class="pub-preview"><div class="pub-preview-placeholder">📄</div></div>
+            <div class="pub-info">
+              <p class="pub-title">Another 2026 Paper: A Study in Bandits and Language Models</p>
+              <p class="pub-authors"><strong>Your Name</strong>, Co-author C, Co-author D, and 3 more authors</p>
+              <p class="pub-venue"><em>Reinforcement Learning Conference (RLC) — Main Track</em>, 2026</p>
+              <div class="pub-links">
+                <a href="#" class="pub-link">PDF</a>
+              </div>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- 2025 -->
+    <div class="year-group">
+      <p class="year-label">2025</p>
+      <div class="pubs-section" style="padding-top:0.75rem;">
+        <ol class="pub-list">
+          <li class="pub-item">
+            <div class="pub-preview"><div class="pub-preview-placeholder">📄</div></div>
+            <div class="pub-info">
+              <p class="pub-title">A Clean Slate: Rethinking Offline Reinforcement Learning Algorithms</p>
+              <p class="pub-authors">Co-author A*, <strong>Your Name</strong>*, Co-author E*, and 2 more authors</p>
+              <p class="pub-venue"><em>Neural Information Processing Systems (NeurIPS) — Main Track Oral</em>, 2025</p>
+              <div class="pub-links">
+                <a href="#" class="pub-link">PDF</a>
+                <a href="#" class="pub-link">Code</a>
+              </div>
+            </div>
+          </li>
+          <li class="pub-item">
+            <div class="pub-preview"><div class="pub-preview-placeholder">📄</div></div>
+            <div class="pub-info">
+              <p class="pub-title">Intent Factored Generation: Unleashing Diversity in Language Models</p>
+              <p class="pub-authors">Co-author F*, <strong>Your Name</strong>*, Co-author G, and 2 more authors</p>
+              <p class="pub-venue"><em>ICML 2025 — Workshop on Exploration in AI Today</em>, 2025</p>
+              <div class="pub-links">
+                <a href="#" class="pub-link">HTML</a>
+                <a href="#" class="pub-link">PDF</a>
+                <a href="#" class="pub-link">Code</a>
+              </div>
+            </div>
+          </li>
+          <li class="pub-item">
+            <div class="pub-preview"><div class="pub-preview-placeholder">📄</div></div>
+            <div class="pub-info">
+              <p class="pub-title">Undersampling Technique for Wide-Frequency Impedance Measurement</p>
+              <p class="pub-authors">Co-author H, <strong>Your Name</strong>, Co-author I, and 3 more authors</p>
+              <p class="pub-venue"><em>IEEE Transactions on Instrumentation and Measurement</em>, 2025</p>
+              <div class="pub-links">
+                <a href="#" class="pub-link">PDF</a>
+              </div>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>© 2026 Your Name · Hosted on <a href="https://pages.github.com/" target="_blank">GitHub Pages</a></p>
+  </footer>
+  <script>
+    document.getElementById('navToggle').addEventListener('click', () => {
+      document.getElementById('navLinks').classList.toggle('open');
+    });
+  </script>
+</body>
+</html>

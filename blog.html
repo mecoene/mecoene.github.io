@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blog — Your Name</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,300&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .blog-list { display: flex; flex-direction: column; gap: 1.2rem; }
+    .blog-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.2rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      transition: border-color 0.15s;
+    }
+    .blog-card:hover { border-color: var(--accent); }
+    .blog-card-date { font-size: 0.78rem; color: var(--text-muted); }
+    .blog-card-title { font-family: var(--font-serif); font-size: 1.05rem; font-weight: 600; }
+    .blog-card-title a { color: var(--text); }
+    .blog-card-title a:hover { color: var(--accent); text-decoration: none; }
+    .blog-card-desc { font-size: 0.86rem; color: var(--text-muted); }
+    .blog-tag {
+      display: inline-block;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 0.74rem;
+      padding: 0.1rem 0.5rem;
+      border-radius: 99px;
+      margin-right: 0.25rem;
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-inner">
+      <a class="nav-brand" href="index.html">Your Name</a>
+      <button class="nav-toggle" id="navToggle">☰</button>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="index.html">About</a></li>
+        <li><a href="publications.html">Publications</a></li>
+        <li><a href="cv.html">CV</a></li>
+        <li><a href="blog.html" class="active">Blog</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main class="container">
+    <div class="page-hero">
+      <h1>Blog</h1>
+      <p>Thoughts on research, machine learning, and life as a PhD student.</p>
+    </div>
+
+    <div class="blog-list">
+      <div class="blog-card">
+        <p class="blog-card-date">May 12, 2026</p>
+        <p class="blog-card-title"><a href="#">What I learned reviewing 20 papers for ICML</a></p>
+        <p class="blog-card-desc">Reflections on the peer review process, patterns in strong vs weak submissions, and why reviewing is underrated for improving your own writing.</p>
+        <div><span class="blog-tag">research</span><span class="blog-tag">peer review</span></div>
+      </div>
+      <div class="blog-card">
+        <p class="blog-card-date">Feb 3, 2026</p>
+        <p class="blog-card-title"><a href="#">A practical guide to experiment tracking for RL research</a></p>
+        <p class="blog-card-desc">My setup for reproducible RL experiments using Weights &amp; Biases, Hydra, and a few opinionated folder structures that have saved me hours.</p>
+        <div><span class="blog-tag">tools</span><span class="blog-tag">RL</span></div>
+      </div>
+      <div class="blog-card">
+        <p class="blog-card-date">Nov 18, 2025</p>
+        <p class="blog-card-title"><a href="#">NeurIPS 2025 — highlights and takeaways</a></p>
+        <p class="blog-card-desc">Notes from the conference: trends I noticed, papers that surprised me, and thoughts on presenting work in person for the first time.</p>
+        <div><span class="blog-tag">conference</span></div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>© 2026 Your Name · Hosted on <a href="https://pages.github.com/" target="_blank">GitHub Pages</a></p>
+  </footer>
+  <script>
+    document.getElementById('navToggle').addEventListener('click', () => {
+      document.getElementById('navLinks').classList.toggle('open');
+    });
+  </script>
+</body>
+</html>
