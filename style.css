@@ -1,14 +1,11 @@
-/* ──────────────────────────────────────────────────────
-   TOKENS
-────────────────────────────────────────────────────── */
 :root {
-  --bg:          #f8f8f6;
+  --bg:          #f8f9fa;
   --surface:     #ffffff;
-  --border:      #e4e2dc;
-  --accent:      #3b5bdb;       /* Oxford-blue leaning indigo */
-  --accent-soft: #eef1fd;
-  --text:        #1a1a1a;
-  --text-muted:  #6b6b6b;
+  --border:      #dee2e6;
+  --accent:      #0062cc;       /* Bootstrap-blue, matches uljad.com link tone */
+  --accent-soft: #e8f0fe;
+  --text:        #212529;
+  --text-muted:  #6c757d;
   --nav-bg:      #ffffff;
 
   --font-serif:  'Source Serif 4', Georgia, serif;
