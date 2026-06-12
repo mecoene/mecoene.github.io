@@ -438,8 +438,8 @@ a:hover { text-decoration: underline; }
 }
 
 .pub-preview {
-    width: 320px;
-    height: 220px;
+    width: 280px;
+    height: 180px;
     overflow: hidden;
     border-radius: 8px;
     flex-shrink: 0;
