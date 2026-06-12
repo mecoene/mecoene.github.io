@@ -156,5 +156,17 @@
       document.getElementById('navLinks').classList.toggle('open');
     });
   </script>
+  
+  <script>
+  if (window.location.pathname.endsWith('/cv.html')) {
+      window.history.replaceState(
+          {},
+          '',
+          window.location.pathname.replace('/cv.html', '') +
+          window.location.search +
+          window.location.hash
+      );
+  }
+  </script>  
 </body>
 </html>
