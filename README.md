@@ -1,6 +1,6 @@
 # Academic Portfolio — GitHub Pages
 
-A clean, static academic personal website inspired by [uljad.com](https://uljad.com/). No build step, no Jekyll, no dependencies — just push and it works.
+A clean, static academic personal website inspired by .... No build step, no Jekyll, no dependencies — just push and it works.
 
 ## Files
 
