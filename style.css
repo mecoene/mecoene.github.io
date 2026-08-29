@@ -328,6 +328,7 @@ a:hover { text-decoration: underline; }
 }
 .pub-authors { font-size: 0.83rem; color: var(--text-muted); margin-bottom: 0.2rem; }
 .pub-venue { font-size: 0.83rem; color: var(--text-muted); margin-bottom: 0.55rem; }
+.pub-desc { font-size: 0.84rem; color: #444; margin-bottom: 0.55rem; }
 .pub-links { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .pub-link {
   font-size: 0.78rem;
@@ -450,4 +451,14 @@ a:hover { text-decoration: underline; }
     height: 100%;
     object-fit: fill;
     display: block;
+}
+
+@media (max-width: 640px) {
+  .pub-item { flex-direction: column; }
+  .pub-preview {
+    width: min(100%, 320px);
+    height: auto;
+    aspect-ratio: 14 / 9;
+  }
+  .pub-info { width: 100%; }
 }
