@@ -587,6 +587,7 @@
   const knnValue = $('knnValue');
   const knnScale = $('knnScale');
   const knnSample = $('knnSample');
+  const knnDownload = $('knnDownload');
   const knnStatus = $('knnStatus');
   const maxKnnSide = 400;
   const knnOffsetCache = new Map();
@@ -777,6 +778,25 @@
     control.addEventListener('change', scheduleKnn);
   });
   knnSample.addEventListener('click', makeSampleImage);
+  knnDownload.addEventListener('click', () => {
+    const link = document.createElement('a');
+    const safeLabel = knnState.label
+      .replace(/\.[^.]+$/, '')
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-|-$/g, '')
+      .toLowerCase() || 'image';
+    link.download = `knn-upscale-${safeLabel}-${knnScale.value}x-k${knnNeighbors.value}.png`;
+
+    knnOutput.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    }, 'image/png');
+  });
 
   new MutationObserver(() => {
     drawClusters();
