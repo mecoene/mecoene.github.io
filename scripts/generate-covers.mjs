@@ -518,6 +518,63 @@ function makeHeart() {
   return data;
 }
 
+function makeRecommendation() {
+  const data = [];
+  for (let f = 0; f < frames; f += 1) {
+    const c = new Canvas(0);
+    for (let x = 0; x < width; x += 20) c.line(x, 0, x, height, 3, 1);
+    for (let y = 0; y < height; y += 20) c.line(0, y, width, y, 3, 1);
+
+    c.rect(18, 22, 92, 116, 9);
+    c.rect(24, 30, 80, 100, 2);
+    for (let row = 0; row < 7; row += 1) {
+      for (let col = 0; col < 6; col += 1) {
+        const x = 32 + col * 11;
+        const y = 40 + row * 12;
+        const wave = Math.sin(f * 0.35 + row * 0.8 + col * 0.45);
+        const seen = hash(row, col, 12) > 0.35;
+        const color = seen ? (wave > 0.35 ? 46 : wave > -0.2 ? 55 : 12) : 5;
+        c.rect(x, y, 8, 8, color);
+      }
+    }
+
+    const nodes = [
+      [146, 62],
+      [146, 112],
+      [196, 42],
+      [196, 86],
+      [196, 130],
+      [244, 64],
+      [244, 116],
+    ];
+    for (const [a, b] of [[0, 2], [0, 3], [0, 4], [1, 2], [1, 3], [1, 4], [2, 5], [3, 5], [3, 6], [4, 6]]) {
+      c.line(nodes[a][0], nodes[a][1], nodes[b][0], nodes[b][1], 49, 1);
+    }
+    const active = Math.floor((f / frames) * 10);
+    for (let i = 0; i <= active; i += 1) {
+      const edge = [[0, 2], [0, 3], [0, 4], [1, 2], [1, 3], [1, 4], [2, 5], [3, 5], [3, 6], [4, 6]][i % 10];
+      c.line(nodes[edge[0]][0], nodes[edge[0]][1], nodes[edge[1]][0], nodes[edge[1]][1], 13, 2);
+    }
+    nodes.forEach(([x, y], i) => {
+      c.circle(x, y, i < 2 ? 9 : 7, i < 2 ? 39 : i < 5 ? 12 : 35);
+      c.circle(x - 2, y - 2, 2, 15);
+    });
+
+    const starX = 145 + (f % frames) * 6;
+    for (let i = 0; i < 5; i += 1) {
+      const x = 124 + i * 15;
+      c.line(x, 156, x + 6, 144, i * 15 < starX - 124 ? 46 : 6, 2);
+      c.line(x + 6, 144, x + 12, 156, i * 15 < starX - 124 ? 46 : 6, 2);
+      c.line(x + 1, 151, x + 11, 151, i * 15 < starX - 124 ? 46 : 6, 2);
+    }
+    c.rect(210, 150, 44, 8, 47);
+    c.rect(214, 153, 34 + Math.sin(f * 0.5) * 6, 2, 56);
+    border(c, 50);
+    data.push(c.pixels);
+  }
+  return data;
+}
+
 const covers = [
   ["wildfire-cover.gif", makeWildfire],
   ["multi-agent-cover.gif", makeAgents],
@@ -525,6 +582,7 @@ const covers = [
   ["murlan-rl-cover.gif", makeMurlan],
   ["balkan-dynamics-cover.gif", makeBalkan],
   ["heart-rate-cover.gif", makeHeart],
+  ["recommendation-systems-cover.gif", makeRecommendation],
 ];
 
 fs.mkdirSync(outDir, { recursive: true });
