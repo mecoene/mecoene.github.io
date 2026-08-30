@@ -20,7 +20,7 @@
 
   const updateThemeColor = (theme) => {
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', theme === 'light' ? '#fffafa' : '#070708');
+    if (meta) meta.setAttribute('content', theme === 'light' ? '#ffffff' : '#070708');
   };
 
   const updateThemeToggle = (button, theme) => {
