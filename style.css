@@ -118,25 +118,15 @@ a:hover { color: var(--accent-hot); text-decoration: underline; }
   margin: 0 auto;
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1rem;
   height: 54px;
 }
-
-.nav-brand {
-  font-family: var(--font-serif);
-  font-weight: 600;
-  font-size: 1.05rem;
-  color: var(--heading);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.nav-brand:hover { text-decoration: none; }
 
 .nav-links {
   display: flex;
   list-style: none;
   gap: 0.15rem;
-  margin-left: auto;
+  margin-left: 0;
 }
 
 .nav-links a {
@@ -167,8 +157,9 @@ a:hover { color: var(--accent-hot); text-decoration: underline; }
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  min-height: 32px;
-  padding: 0.22rem 0.6rem 0.22rem 0.28rem;
+  min-height: 34px;
+  margin-left: auto;
+  padding: 0.22rem 0.68rem 0.22rem 0.28rem;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--toggle-bg);
@@ -194,8 +185,8 @@ a:hover { color: var(--accent-hot); text-decoration: underline; }
 
 .theme-toggle-track {
   position: relative;
-  width: 34px;
-  height: 18px;
+  width: 48px;
+  height: 26px;
   border-radius: 999px;
   background: var(--toggle-track);
   box-shadow: inset 0 0 0 1px var(--border);
@@ -206,16 +197,41 @@ a:hover { color: var(--accent-hot); text-decoration: underline; }
   position: absolute;
   top: 3px;
   left: 3px;
-  width: 12px;
-  height: 12px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
   border-radius: 50%;
   background: var(--toggle-thumb);
   box-shadow: 0 2px 8px rgba(0,0,0,.22);
-  transition: transform 0.18s ease, background 0.18s ease;
+  color: var(--button-hover-text);
+  transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease;
 }
 
 :root[data-theme="light"] .theme-toggle-thumb {
-  transform: translateX(16px);
+  transform: translateX(22px);
+  color: #fff;
+}
+
+.theme-toggle-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.theme-toggle-moon {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.theme-toggle-slash {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 2.4;
 }
 
 /* ──────────────────────────────────────────────────────

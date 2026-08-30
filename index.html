@@ -26,14 +26,20 @@
 <body>
   <nav class="navbar">
     <div class="nav-inner">
-      <a class="nav-brand" href="/">Ene Meco</a>
       <ul class="nav-links" id="navLinks">
         <li><a href="/" class="active">About</a></li>
         <li><a href="/publications/">Projects</a></li>
         <li><a href="/cv/">CV</a></li>
       </ul>
-      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch to light mode" aria-pressed="false">
-        <span class="theme-toggle-track" aria-hidden="true"><span class="theme-toggle-thumb"></span></span>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch to light mode" aria-pressed="false" title="Toggle light and dark mode">
+        <span class="theme-toggle-track" aria-hidden="true">
+          <span class="theme-toggle-thumb">
+            <svg class="theme-toggle-icon" viewBox="0 0 24 24" focusable="false">
+              <path class="theme-toggle-moon" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"></path>
+              <path class="theme-toggle-slash" d="M5 19 19 5"></path>
+            </svg>
+          </span>
+        </span>
         <span class="theme-toggle-text">Dark</span>
       </button>
       <button class="nav-toggle" id="navToggle" type="button" aria-label="Toggle menu" aria-controls="navLinks" aria-expanded="false">☰</button>

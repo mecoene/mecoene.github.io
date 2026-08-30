@@ -1,18 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="EM monogram">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="AI style EM monogram">
   <defs>
-    <linearGradient id="bg" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#1a0a0e"/>
-      <stop offset="0.52" stop-color="#070708"/>
-      <stop offset="1" stop-color="#b91c1c"/>
-    </linearGradient>
-    <linearGradient id="red" x1="10" y1="54" x2="56" y2="8" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#fb365f"/>
-      <stop offset="1" stop-color="#dc2626"/>
-    </linearGradient>
+    <radialGradient id="core" cx="50%" cy="50%" r="65%">
+      <stop offset="0" stop-color="#1f070d"/>
+      <stop offset="0.58" stop-color="#070708"/>
+      <stop offset="1" stop-color="#000"/>
+    </radialGradient>
+    <filter id="glow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="1.3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
-  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
-  <path d="M10 52 52 10h7L17 52z" fill="url(#red)" opacity=".72"/>
-  <path d="M15 18h18v5H21v7h10v5H21v7h13v5H15z" fill="#fffafa"/>
-  <path d="M36 47V18h6l7 12 7-12h6v29h-6V29l-6 10h-2l-6-10v18z" fill="#fffafa"/>
-  <path d="M14 50h36" fill="none" stroke="#fb365f" stroke-width="2.8" stroke-linecap="round"/>
+  <rect width="64" height="64" rx="13" fill="url(#core)"/>
+  <path d="M11 15h19M11 32h15M11 49h20M11 15v34" fill="none" stroke="#fff7f8" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M38 49V15l8.5 17L55 15v34" fill="none" stroke="#fff7f8" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g filter="url(#glow)" fill="none" stroke="#fb365f" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M30 15h6M26 32h10M31 49h5" stroke-width="2.5"/>
+    <path d="M18 24l10-9M19 41l11 8M46 32h8" stroke-width="1.8" opacity=".9"/>
+  </g>
+  <g fill="#fb365f" filter="url(#glow)">
+    <circle cx="11" cy="15" r="2.2"/>
+    <circle cx="30" cy="15" r="2.2"/>
+    <circle cx="26" cy="32" r="2.2"/>
+    <circle cx="31" cy="49" r="2.2"/>
+    <circle cx="46" cy="32" r="2.2"/>
+    <circle cx="55" cy="15" r="2.2"/>
+    <circle cx="55" cy="49" r="2.2"/>
+  </g>
 </svg>
