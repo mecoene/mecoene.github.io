@@ -607,6 +607,281 @@
     ctx.putImageData(imageData, 0, 0);
   };
 
+  const safeFileLabel = (label) => (
+    label
+      .replace(/\.[^.]+$/, '')
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-|-$/g, '')
+      .toLowerCase() || 'image'
+  );
+
+  const downloadCanvasPng = (canvas, filename) => {
+    const link = document.createElement('a');
+    link.download = filename;
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    }, 'image/png');
+  };
+
+  const dctSource = $('dctSource');
+  const dctOutput = $('dctOutput');
+  const dctUpload = $('dctUpload');
+  const dctKeep = $('dctKeep');
+  const dctKeepValue = $('dctKeepValue');
+  const dctMode = $('dctMode');
+  const dctSample = $('dctSample');
+  const dctDownload = $('dctDownload');
+  const dctStatus = $('dctStatus');
+  const maxDctSide = 400;
+  const dctSize = 8;
+  const dctAlpha = Array.from({ length: dctSize }, (_, index) => (index === 0 ? Math.SQRT1_2 : 1));
+  const dctCos = Array.from({ length: dctSize }, (_, u) => (
+    Array.from({ length: dctSize }, (_, x) => Math.cos(((2 * x + 1) * u * Math.PI) / 16))
+  ));
+  const dctZigZag = (() => {
+    const order = [];
+    for (let sum = 0; sum <= 14; sum += 1) {
+      if (sum % 2 === 0) {
+        for (let y = Math.min(sum, 7); y >= Math.max(0, sum - 7); y -= 1) {
+          order.push(y * 8 + (sum - y));
+        }
+      } else {
+        for (let x = Math.min(sum, 7); x >= Math.max(0, sum - 7); x -= 1) {
+          order.push((sum - x) * 8 + x);
+        }
+      }
+    }
+    return order;
+  })();
+  const dctMasks = Array.from({ length: 65 }, (_, keep) => {
+    const mask = new Uint8Array(64);
+    dctZigZag.slice(0, Math.max(1, keep)).forEach((index) => {
+      mask[index] = 1;
+    });
+    return mask;
+  });
+  const dctState = {
+    imageData: null,
+    width: 192,
+    height: 128,
+    label: 'Sample image',
+    pending: false,
+    reconstruction: null,
+    error: null,
+  };
+
+  const setDctImage = (image, label) => {
+    const sourceWidth = image.naturalWidth || image.width;
+    const sourceHeight = image.naturalHeight || image.height;
+    const ratio = Math.min(1, maxDctSide / Math.max(sourceWidth, sourceHeight));
+    const width = Math.max(1, Math.round(sourceWidth * ratio));
+    const height = Math.max(1, Math.round(sourceHeight * ratio));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(image, 0, 0, width, height);
+    dctState.imageData = ctx.getImageData(0, 0, width, height);
+    dctState.width = width;
+    dctState.height = height;
+    dctState.label = ratio < 1 ? `${label} capped` : label;
+    renderDct();
+  };
+
+  const makeDctSampleImage = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 192;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    gradient.addColorStop(0, '#070708');
+    gradient.addColorStop(0.45, '#5b0b1c');
+    gradient.addColorStop(1, '#fff7f8');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let y = 0; y < canvas.height; y += 8) {
+      for (let x = 0; x < canvas.width; x += 8) {
+        ctx.fillStyle = (x / 8 + y / 8) % 2 === 0 ? 'rgba(255,255,255,.18)' : 'rgba(225,29,72,.22)';
+        ctx.fillRect(x, y, 8, 8);
+      }
+    }
+    ctx.fillStyle = '#fff7f8';
+    ctx.beginPath();
+    ctx.arc(56, 58, 30, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#e11d48';
+    ctx.beginPath();
+    ctx.arc(61, 54, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#070708';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(103, 30);
+    ctx.lineTo(150, 30);
+    ctx.lineTo(116, 92);
+    ctx.lineTo(166, 92);
+    ctx.stroke();
+    dctState.imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    dctState.width = canvas.width;
+    dctState.height = canvas.height;
+    dctState.label = 'Sample image';
+    renderDct();
+  };
+
+  const compressDct = (source, keep) => {
+    const width = source.width;
+    const height = source.height;
+    const src = source.data;
+    const output = new ImageData(width, height);
+    const error = new ImageData(width, height);
+    const out = output.data;
+    const err = error.data;
+    const mask = dctMasks[keep];
+    const block = new Float32Array(64);
+    const row = new Float32Array(64);
+    const coeff = new Float32Array(64);
+    const temp = new Float32Array(64);
+
+    for (let by = 0; by < height; by += 8) {
+      for (let bx = 0; bx < width; bx += 8) {
+        for (let channel = 0; channel < 3; channel += 1) {
+          for (let y = 0; y < 8; y += 1) {
+            const py = clamp(by + y, 0, height - 1);
+            for (let x = 0; x < 8; x += 1) {
+              const px = clamp(bx + x, 0, width - 1);
+              block[y * 8 + x] = src[(py * width + px) * 4 + channel] - 128;
+            }
+          }
+
+          for (let y = 0; y < 8; y += 1) {
+            for (let u = 0; u < 8; u += 1) {
+              let total = 0;
+              for (let x = 0; x < 8; x += 1) {
+                total += block[y * 8 + x] * dctCos[u][x];
+              }
+              row[y * 8 + u] = 0.5 * dctAlpha[u] * total;
+            }
+          }
+
+          for (let v = 0; v < 8; v += 1) {
+            for (let u = 0; u < 8; u += 1) {
+              let total = 0;
+              for (let y = 0; y < 8; y += 1) {
+                total += row[y * 8 + u] * dctCos[v][y];
+              }
+              const index = v * 8 + u;
+              coeff[index] = mask[index] ? 0.5 * dctAlpha[v] * total : 0;
+            }
+          }
+
+          for (let y = 0; y < 8; y += 1) {
+            for (let u = 0; u < 8; u += 1) {
+              let total = 0;
+              for (let v = 0; v < 8; v += 1) {
+                total += dctAlpha[v] * coeff[v * 8 + u] * dctCos[v][y];
+              }
+              temp[y * 8 + u] = 0.5 * total;
+            }
+          }
+
+          for (let y = 0; y < 8; y += 1) {
+            const py = by + y;
+            if (py >= height) continue;
+            for (let x = 0; x < 8; x += 1) {
+              const px = bx + x;
+              if (px >= width) continue;
+              let total = 0;
+              for (let u = 0; u < 8; u += 1) {
+                total += dctAlpha[u] * temp[y * 8 + u] * dctCos[u][x];
+              }
+              out[(py * width + px) * 4 + channel] = clamp(0.5 * total + 128, 0, 255);
+            }
+          }
+        }
+
+        for (let y = 0; y < 8; y += 1) {
+          const py = by + y;
+          if (py >= height) continue;
+          for (let x = 0; x < 8; x += 1) {
+            const px = bx + x;
+            if (px >= width) continue;
+            const index = (py * width + px) * 4;
+            out[index + 3] = src[index + 3];
+          }
+        }
+      }
+    }
+
+    for (let index = 0; index < src.length; index += 4) {
+      const diff = (
+        Math.abs(src[index] - out[index]) +
+        Math.abs(src[index + 1] - out[index + 1]) +
+        Math.abs(src[index + 2] - out[index + 2])
+      ) / 3;
+      const heat = clamp(diff * 4.2, 0, 255);
+      err[index] = heat;
+      err[index + 1] = clamp(24 + diff * 0.35, 0, 120);
+      err[index + 2] = clamp(60 + diff * 0.9, 0, 255);
+      err[index + 3] = 255;
+    }
+
+    return { reconstruction: output, error };
+  };
+
+  const renderDct = () => {
+    if (!dctState.imageData) return;
+    const keep = Number(dctKeep.value);
+    dctKeepValue.value = `${keep}/64`;
+    const result = compressDct(dctState.imageData, keep);
+    dctState.reconstruction = result.reconstruction;
+    dctState.error = result.error;
+    putImageData(dctSource, dctState.imageData);
+    putImageData(dctOutput, dctMode.value === 'error' ? dctState.error : dctState.reconstruction);
+    const percent = Math.round((keep / 64) * 100);
+    dctStatus.textContent = `${dctState.label} | ${dctState.width}x${dctState.height} | ${keep}/64 coeffs (${percent}%)`;
+  };
+
+  const scheduleDct = () => {
+    if (dctState.pending) return;
+    dctState.pending = true;
+    requestAnimationFrame(() => {
+      dctState.pending = false;
+      renderDct();
+    });
+  };
+
+  dctUpload.addEventListener('change', () => {
+    const file = dctUpload.files && dctUpload.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      setDctImage(image, file.name);
+      URL.revokeObjectURL(url);
+    };
+    image.src = url;
+  });
+
+  [dctKeep, dctMode].forEach((control) => {
+    control.addEventListener('input', scheduleDct);
+    control.addEventListener('change', scheduleDct);
+  });
+  dctSample.addEventListener('click', makeDctSampleImage);
+  dctDownload.addEventListener('click', () => {
+    const mode = dctMode.value === 'error' ? 'error-map' : 'compressed';
+    const filename = `dct-${mode}-${safeFileLabel(dctState.label)}-keep${dctKeep.value}.png`;
+    downloadCanvasPng(dctOutput, filename);
+  });
+
   const makeSampleImage = () => {
     const canvas = document.createElement('canvas');
     canvas.width = 96;
@@ -779,23 +1054,8 @@
   });
   knnSample.addEventListener('click', makeSampleImage);
   knnDownload.addEventListener('click', () => {
-    const link = document.createElement('a');
-    const safeLabel = knnState.label
-      .replace(/\.[^.]+$/, '')
-      .replace(/[^a-z0-9]+/gi, '-')
-      .replace(/^-|-$/g, '')
-      .toLowerCase() || 'image';
-    link.download = `knn-upscale-${safeLabel}-${knnScale.value}x-k${knnNeighbors.value}.png`;
-
-    knnOutput.toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      link.href = url;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 0);
-    }, 'image/png');
+    const filename = `knn-upscale-${safeFileLabel(knnState.label)}-${knnScale.value}x-k${knnNeighbors.value}.png`;
+    downloadCanvasPng(knnOutput, filename);
   });
 
   new MutationObserver(() => {
@@ -806,5 +1066,6 @@
   seedClusterPoints();
   renderKernelGrid();
   resetConvGrid();
+  makeDctSampleImage();
   makeSampleImage();
 })();
