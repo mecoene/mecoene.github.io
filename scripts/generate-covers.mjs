@@ -3,8 +3,8 @@ import path from "node:path";
 
 const width = 280;
 const height = 180;
-const frames = 24;
-const delay = 7;
+const frames = 16;
+const delay = 8;
 const outDir = path.join("assets", "covers");
 
 const palette = [
@@ -113,42 +113,23 @@ function lzwEncode(indices, minCodeSize) {
   const clear = 1 << minCodeSize;
   const end = clear + 1;
   let codeSize = minCodeSize + 1;
-  let nextCode = end + 1;
-  let dict = new Map();
   const writer = bitWriter();
 
-  const reset = () => {
-    dict = new Map();
-    codeSize = minCodeSize + 1;
-    nextCode = end + 1;
-  };
-
-  const codeFor = (key) => (key.length === 1 ? key.charCodeAt(0) : dict.get(key));
-
+  // Keep each packet below the decoder's code-size growth threshold. This is
+  // intentionally uncompressed, but avoids fragile GIF LZW dictionary behavior.
+  const packetPixels = Math.max(8, clear - 16);
+  let inPacket = 0;
   writer.write(clear, codeSize);
-  let prefix = String.fromCharCode(indices[0]);
 
-  for (let i = 1; i < indices.length; i += 1) {
-    const char = String.fromCharCode(indices[i]);
-    const combo = prefix + char;
-    if (dict.has(combo)) {
-      prefix = combo;
-      continue;
-    }
-
-    writer.write(codeFor(prefix), codeSize);
-    if (nextCode < 4096) {
-      dict.set(combo, nextCode);
-      nextCode += 1;
-      if (nextCode === (1 << codeSize) && codeSize < 12) codeSize += 1;
-    } else {
+  for (let i = 0; i < indices.length; i += 1) {
+    writer.write(indices[i], codeSize);
+    inPacket += 1;
+    if (inPacket >= packetPixels && i < indices.length - 1) {
       writer.write(clear, codeSize);
-      reset();
+      inPacket = 0;
     }
-    prefix = char;
   }
 
-  writer.write(codeFor(prefix), codeSize);
   writer.write(end, codeSize);
   return writer.finish();
 }
@@ -306,7 +287,7 @@ function makeWildfire() {
       c.line(x + 14, 112, x - 8, 174, 20, 1);
     }
 
-    const front = -55 + p * (width + 110);
+    const front = 34 + p * (width + 60);
     for (let y = 98; y < height - 7; y += 7) {
       for (let x = 4; x < width - 5; x += 7) {
         const wave = Math.sin((y * 0.13) + (f * 0.42)) * 12;
