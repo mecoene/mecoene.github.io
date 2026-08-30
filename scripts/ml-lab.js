@@ -413,17 +413,6 @@
 
   const resetConvGrid = () => {
     convState.grid.fill(0);
-    for (let y = 0; y < convSize; y += 1) {
-      for (let x = 0; x < convSize; x += 1) {
-        const eShape = x >= 5 && x <= 15 && (y >= 6 && y <= 9 || y >= 16 && y <= 19 || y >= 27 && y <= 30 || x <= 8 && y >= 6 && y <= 30);
-        const mLeft = x >= 21 && x <= 23 && y >= 7 && y <= 30;
-        const mRight = x >= 31 && x <= 33 && y >= 7 && y <= 30;
-        const mDiagLeft = Math.abs((x - 23) - (y - 7) * 0.45) < 1.2 && y >= 7 && y <= 22;
-        const mDiagRight = Math.abs((33 - x) - (y - 7) * 0.45) < 1.2 && y >= 7 && y <= 22;
-        const circle = (x - 27) ** 2 + (y - 25) ** 2 < 18;
-        convState.grid[y * convSize + x] = eShape || mLeft || mRight || mDiagLeft || mDiagRight || circle ? 245 : 8;
-      }
-    }
     drawConvolution();
   };
 
@@ -607,12 +596,10 @@
   };
 
   const setKnnImage = (image, label) => {
-    const maxSide = 96;
     const sourceWidth = image.naturalWidth || image.width;
     const sourceHeight = image.naturalHeight || image.height;
-    const ratio = Math.min(1, maxSide / Math.max(sourceWidth, sourceHeight));
-    const width = Math.max(1, Math.round(sourceWidth * ratio));
-    const height = Math.max(1, Math.round(sourceHeight * ratio));
+    const width = Math.max(1, sourceWidth);
+    const height = Math.max(1, sourceHeight);
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
