@@ -385,6 +385,7 @@
   const convState = {
     grid: new Float32Array(convSize * convSize),
     painting: false,
+    customKernel: [0, 0, 0, 0, 1, 0, 0, 0, 0],
   };
 
   const kernels = {
@@ -393,7 +394,7 @@
       offset: 0,
     },
     sharpen: {
-      matrix: [0, -1, 0, -1, 5, -1, 0, -1, 0],
+      matrix: [-1, -1, -1, -1, 9, -1, -1, -1, -1],
       offset: 0,
     },
     edge: {
@@ -410,6 +411,12 @@
       offset: 128,
     },
   };
+
+  const activeKernel = () => (
+    convKernel.value === 'custom'
+      ? { matrix: convState.customKernel, offset: 0 }
+      : kernels[convKernel.value]
+  );
 
   const resetConvGrid = () => {
     convState.grid.fill(0);
@@ -448,7 +455,7 @@
   };
 
   const convolve = () => {
-    const kernel = kernels[convKernel.value];
+    const kernel = activeKernel();
     const output = new Float32Array(convState.grid.length);
     const mix = Number(convMix.value) / 100;
 
@@ -482,29 +489,68 @@
   };
 
   const renderKernelGrid = () => {
-    const kernel = kernels[convKernel.value];
+    const kernel = activeKernel();
     kernelGrid.innerHTML = '';
     kernel.matrix.forEach((value) => {
       const cell = document.createElement('div');
       cell.className = 'kernel-cell';
-      cell.textContent = formatKernelCell(value);
+      if (convKernel.value === 'custom') {
+        const input = document.createElement('input');
+        input.className = 'kernel-input';
+        input.type = 'number';
+        input.step = '0.25';
+        input.value = String(value);
+        input.setAttribute('aria-label', `Kernel value ${kernelGrid.children.length + 1}`);
+        input.addEventListener('input', () => {
+          const nextValue = Number.parseFloat(input.value);
+          convState.customKernel[Number(input.dataset.index)] = Number.isFinite(nextValue) ? nextValue : 0;
+          drawConvolution();
+        });
+        input.dataset.index = String(kernelGrid.children.length);
+        cell.appendChild(input);
+      } else {
+        cell.textContent = formatKernelCell(value);
+      }
       kernelGrid.appendChild(cell);
     });
   };
 
   const drawConvolution = () => {
     convMixValue.value = `${convMix.value}%`;
-    renderKernelGrid();
     drawMatrixCanvas(convSource, convState.grid);
     drawMatrixCanvas(convOutput, convolve());
-    convStatus.textContent = convKernel.value === 'sobel' ? 'Sobel X/Y' : '3x3 kernel';
+    convStatus.textContent = convKernel.value === 'sobel' ? 'Sobel X/Y' : convKernel.value === 'custom' ? 'Custom 3x3' : '3x3 kernel';
+  };
+
+  const setConvCell = (x, y, value) => {
+    if (x < 0 || x >= convSize || y < 0 || y >= convSize) return;
+    const index = y * convSize + x;
+    convState.grid[index] = value > convState.grid[index] ? value : convState.grid[index];
   };
 
   const paintConvCell = (event) => {
     const point = canvasPoint(convSource, event);
     const x = clamp(Math.floor(point.x / (convSource.width / convSize)), 0, convSize - 1);
     const y = clamp(Math.floor(point.y / (convSource.height / convSize)), 0, convSize - 1);
-    convState.grid[y * convSize + x] = event.shiftKey ? 0 : 255;
+    if (event.shiftKey) {
+      for (let yy = -1; yy <= 1; yy += 1) {
+        for (let xx = -1; xx <= 1; xx += 1) {
+          if (x + xx >= 0 && x + xx < convSize && y + yy >= 0 && y + yy < convSize) {
+            convState.grid[(y + yy) * convSize + x + xx] = 0;
+          }
+        }
+      }
+    } else {
+      setConvCell(x, y, 255);
+      setConvCell(x - 1, y, 150);
+      setConvCell(x + 1, y, 150);
+      setConvCell(x, y - 1, 150);
+      setConvCell(x, y + 1, 150);
+      setConvCell(x - 1, y - 1, 75);
+      setConvCell(x + 1, y - 1, 75);
+      setConvCell(x - 1, y + 1, 75);
+      setConvCell(x + 1, y + 1, 75);
+    }
     drawConvolution();
   };
 
@@ -526,10 +572,12 @@
     convState.painting = false;
   });
 
-  [convKernel, convMix].forEach((control) => {
-    control.addEventListener('input', drawConvolution);
-    control.addEventListener('change', drawConvolution);
+  convKernel.addEventListener('change', () => {
+    renderKernelGrid();
+    drawConvolution();
   });
+  convMix.addEventListener('input', drawConvolution);
+  convMix.addEventListener('change', drawConvolution);
   convReset.addEventListener('click', resetConvGrid);
 
   const knnSource = $('knnSource');
@@ -540,6 +588,8 @@
   const knnScale = $('knnScale');
   const knnSample = $('knnSample');
   const knnStatus = $('knnStatus');
+  const maxKnnSide = 400;
+  const knnOffsetCache = new Map();
   const knnState = {
     imageData: null,
     width: 96,
@@ -598,8 +648,9 @@
   const setKnnImage = (image, label) => {
     const sourceWidth = image.naturalWidth || image.width;
     const sourceHeight = image.naturalHeight || image.height;
-    const width = Math.max(1, sourceWidth);
-    const height = Math.max(1, sourceHeight);
+    const ratio = Math.min(1, maxKnnSide / Math.max(sourceWidth, sourceHeight));
+    const width = Math.max(1, Math.round(sourceWidth * ratio));
+    const height = Math.max(1, Math.round(sourceHeight * ratio));
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
@@ -610,8 +661,38 @@
     knnState.imageData = ctx.getImageData(0, 0, width, height);
     knnState.width = width;
     knnState.height = height;
-    knnState.label = label;
+    knnState.label = ratio < 1 ? `${label} capped` : label;
     renderKnn();
+  };
+
+  const getKnnOffsets = (scale, k) => {
+    const key = `${scale}-${k}`;
+    if (knnOffsetCache.has(key)) return knnOffsetCache.get(key);
+    const radius = Math.max(2, Math.ceil(Math.sqrt(k)) + 1);
+    const phases = [];
+
+    for (let phaseY = 0; phaseY < scale; phaseY += 1) {
+      for (let phaseX = 0; phaseX < scale; phaseX += 1) {
+        const sx = (phaseX + 0.5) / scale - 0.5;
+        const sy = (phaseY + 0.5) / scale - 0.5;
+        const baseX = Math.floor(sx);
+        const baseY = Math.floor(sy);
+        const offsets = [];
+        for (let yy = baseY - radius; yy <= baseY + radius; yy += 1) {
+          for (let xx = baseX - radius; xx <= baseX + radius; xx += 1) {
+            offsets.push({
+              dx: xx - baseX,
+              dy: yy - baseY,
+              distance: (sx - xx) ** 2 + (sy - yy) ** 2,
+            });
+          }
+        }
+        phases[phaseY * scale + phaseX] = offsets.sort((a, b) => a.distance - b.distance).slice(0, k);
+      }
+    }
+
+    knnOffsetCache.set(key, phases);
+    return phases;
   };
 
   const upscaleKnn = () => {
@@ -621,26 +702,17 @@
     const targetWidth = source.width * scale;
     const targetHeight = source.height * scale;
     const output = new ImageData(targetWidth, targetHeight);
-    const radius = Math.max(2, Math.ceil(Math.sqrt(k)) + 1);
+    const phaseOffsets = getKnnOffsets(scale, k);
 
     for (let y = 0; y < targetHeight; y += 1) {
       const sy = (y + 0.5) / scale - 0.5;
       const baseY = Math.floor(sy);
+      const phaseY = y % scale;
       for (let x = 0; x < targetWidth; x += 1) {
         const sx = (x + 0.5) / scale - 0.5;
         const baseX = Math.floor(sx);
-        const candidates = [];
-
-        for (let yy = baseY - radius; yy <= baseY + radius; yy += 1) {
-          const py = clamp(yy, 0, source.height - 1);
-          for (let xx = baseX - radius; xx <= baseX + radius; xx += 1) {
-            const px = clamp(xx, 0, source.width - 1);
-            const distance = (sx - px) ** 2 + (sy - py) ** 2;
-            candidates.push({ distance, index: (py * source.width + px) * 4 });
-          }
-        }
-
-        candidates.sort((a, b) => a.distance - b.distance);
+        const phaseX = x % scale;
+        const offsets = phaseOffsets[phaseY * scale + phaseX];
         const targetIndex = (y * targetWidth + x) * 4;
         let totalWeight = 0;
         let red = 0;
@@ -648,14 +720,17 @@
         let blue = 0;
         let alpha = 0;
 
-        for (let i = 0; i < k; i += 1) {
-          const candidate = candidates[i];
-          const weight = 1 / (candidate.distance + 0.0001);
+        for (let offsetIndex = 0; offsetIndex < offsets.length; offsetIndex += 1) {
+          const offset = offsets[offsetIndex];
+          const px = clamp(baseX + offset.dx, 0, source.width - 1);
+          const py = clamp(baseY + offset.dy, 0, source.height - 1);
+          const sourceIndex = (py * source.width + px) * 4;
+          const weight = 1 / (offset.distance + 0.0001);
           totalWeight += weight;
-          red += source.data[candidate.index] * weight;
-          green += source.data[candidate.index + 1] * weight;
-          blue += source.data[candidate.index + 2] * weight;
-          alpha += source.data[candidate.index + 3] * weight;
+          red += source.data[sourceIndex] * weight;
+          green += source.data[sourceIndex + 1] * weight;
+          blue += source.data[sourceIndex + 2] * weight;
+          alpha += source.data[sourceIndex + 3] * weight;
         }
 
         output.data[targetIndex] = red / totalWeight;
@@ -709,6 +784,7 @@
   }).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
 
   seedClusterPoints();
+  renderKernelGrid();
   resetConvGrid();
   makeSampleImage();
 })();

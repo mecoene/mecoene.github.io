@@ -788,6 +788,23 @@ a:hover { color: var(--accent-hot); text-decoration: underline; }
   border-bottom: none;
 }
 
+.kernel-input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--copy);
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: center;
+  padding: 0.35rem 0.15rem;
+}
+
+.kernel-input:focus {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
 .file-input {
   position: absolute;
   width: 1px;
