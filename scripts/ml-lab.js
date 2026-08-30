@@ -586,7 +586,6 @@
   const knnNeighbors = $('knnNeighbors');
   const knnValue = $('knnValue');
   const knnScale = $('knnScale');
-  const knnSample = $('knnSample');
   const knnDownload = $('knnDownload');
   const knnStatus = $('knnStatus');
   const maxKnnSide = 400;
@@ -595,7 +594,7 @@
     imageData: null,
     width: 96,
     height: 96,
-    label: 'Sample image',
+    label: 'Image',
     pending: false,
   };
 
@@ -635,7 +634,6 @@
   const dctKeep = $('dctKeep');
   const dctKeepValue = $('dctKeepValue');
   const dctMode = $('dctMode');
-  const dctSample = $('dctSample');
   const dctDownload = $('dctDownload');
   const dctStatus = $('dctStatus');
   const maxDctSide = 400;
@@ -670,7 +668,7 @@
     imageData: null,
     width: 192,
     height: 128,
-    label: 'Sample image',
+    label: 'Image',
     pending: false,
     reconstruction: null,
     error: null,
@@ -693,47 +691,7 @@
     dctState.width = width;
     dctState.height = height;
     dctState.label = ratio < 1 ? `${label} capped` : label;
-    renderDct();
-  };
-
-  const makeDctSampleImage = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 192;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    gradient.addColorStop(0, '#070708');
-    gradient.addColorStop(0.45, '#5b0b1c');
-    gradient.addColorStop(1, '#fff7f8');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    for (let y = 0; y < canvas.height; y += 8) {
-      for (let x = 0; x < canvas.width; x += 8) {
-        ctx.fillStyle = (x / 8 + y / 8) % 2 === 0 ? 'rgba(255,255,255,.18)' : 'rgba(225,29,72,.22)';
-        ctx.fillRect(x, y, 8, 8);
-      }
-    }
-    ctx.fillStyle = '#fff7f8';
-    ctx.beginPath();
-    ctx.arc(56, 58, 30, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#e11d48';
-    ctx.beginPath();
-    ctx.arc(61, 54, 12, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#070708';
-    ctx.lineWidth = 6;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(103, 30);
-    ctx.lineTo(150, 30);
-    ctx.lineTo(116, 92);
-    ctx.lineTo(166, 92);
-    ctx.stroke();
-    dctState.imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    dctState.width = canvas.width;
-    dctState.height = canvas.height;
-    dctState.label = 'Sample image';
+    dctDownload.disabled = false;
     renderDct();
   };
 
@@ -838,9 +796,9 @@
   };
 
   const renderDct = () => {
-    if (!dctState.imageData) return;
     const keep = Number(dctKeep.value);
     dctKeepValue.value = `${keep}/64`;
+    if (!dctState.imageData) return;
     const result = compressDct(dctState.imageData, keep);
     dctState.reconstruction = result.reconstruction;
     dctState.error = result.error;
@@ -875,51 +833,12 @@
     control.addEventListener('input', scheduleDct);
     control.addEventListener('change', scheduleDct);
   });
-  dctSample.addEventListener('click', makeDctSampleImage);
   dctDownload.addEventListener('click', () => {
+    if (!dctState.reconstruction && !dctState.error) return;
     const mode = dctMode.value === 'error' ? 'error-map' : 'compressed';
     const filename = `dct-${mode}-${safeFileLabel(dctState.label)}-keep${dctKeep.value}.png`;
     downloadCanvasPng(dctOutput, filename);
   });
-
-  const makeSampleImage = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 96;
-    canvas.height = 96;
-    const ctx = canvas.getContext('2d');
-    const gradient = ctx.createLinearGradient(0, 0, 96, 96);
-    gradient.addColorStop(0, '#070708');
-    gradient.addColorStop(1, '#350711');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 96, 96);
-    ctx.fillStyle = '#fff7f8';
-    ctx.fillRect(16, 18, 30, 10);
-    ctx.fillRect(16, 43, 25, 10);
-    ctx.fillRect(16, 68, 32, 10);
-    ctx.fillRect(16, 18, 10, 60);
-    ctx.beginPath();
-    ctx.moveTo(56, 78);
-    ctx.lineTo(56, 18);
-    ctx.lineTo(72, 48);
-    ctx.lineTo(88, 18);
-    ctx.lineTo(88, 78);
-    ctx.lineWidth = 9;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = '#fff7f8';
-    ctx.stroke();
-    ctx.fillStyle = '#fb365f';
-    [[16, 18], [46, 18], [41, 48], [48, 73], [72, 48], [88, 18], [88, 78]].forEach(([x, y]) => {
-      ctx.beginPath();
-      ctx.arc(x, y, 4.6, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    knnState.imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    knnState.width = canvas.width;
-    knnState.height = canvas.height;
-    knnState.label = 'Sample image';
-    renderKnn();
-  };
 
   const setKnnImage = (image, label) => {
     const sourceWidth = image.naturalWidth || image.width;
@@ -938,6 +857,7 @@
     knnState.width = width;
     knnState.height = height;
     knnState.label = ratio < 1 ? `${label} capped` : label;
+    knnDownload.disabled = false;
     renderKnn();
   };
 
@@ -1021,6 +941,7 @@
 
   const renderKnn = () => {
     knnValue.value = knnNeighbors.value;
+    if (!knnState.imageData) return;
     putImageData(knnSource, knnState.imageData);
     const output = upscaleKnn();
     putImageData(knnOutput, output);
@@ -1052,8 +973,8 @@
     control.addEventListener('input', scheduleKnn);
     control.addEventListener('change', scheduleKnn);
   });
-  knnSample.addEventListener('click', makeSampleImage);
   knnDownload.addEventListener('click', () => {
+    if (!knnState.imageData) return;
     const filename = `knn-upscale-${safeFileLabel(knnState.label)}-${knnScale.value}x-k${knnNeighbors.value}.png`;
     downloadCanvasPng(knnOutput, filename);
   });
@@ -1066,6 +987,4 @@
   seedClusterPoints();
   renderKernelGrid();
   resetConvGrid();
-  makeDctSampleImage();
-  makeSampleImage();
 })();

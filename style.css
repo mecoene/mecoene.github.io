@@ -755,6 +755,16 @@ a:hover { color: var(--accent-hot); text-decoration: underline; }
   transform: translateY(-1px);
 }
 
+.lab-button:disabled,
+.lab-button:disabled:hover {
+  border-color: var(--border);
+  background: var(--control-bg);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.62;
+  transform: none;
+}
+
 .lab-button-secondary {
   border-color: var(--border);
   color: var(--text-muted);
