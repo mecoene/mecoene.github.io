@@ -8,17 +8,17 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,300;1,8..60,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
   <nav class="navbar">
     <div class="nav-inner">
-      <a class="nav-brand" href="index.html">Ene Meco</a>
+      <a class="nav-brand" href="/">Ene Meco</a>
       <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">☰</button>
       <ul class="nav-links" id="navLinks">
-        <li><a href="index.html" class="active">About</a></li>
-        <li><a href="publications.html">Projects</a></li>
-        <li><a href="cv.html">CV</a></li>
+        <li><a href="/" class="active">About</a></li>
+        <li><a href="/publications/">Projects</a></li>
+        <li><a href="/cv/">CV</a></li>
       </ul>
     </div>
   </nav>
@@ -66,7 +66,7 @@
         </div>
       </div>
       <div class="hero-photo">
-        <img src="assets/photo.jpg" alt="Ene Meco" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+        <img src="/assets/photo.jpg" alt="Ene Meco" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
         <div class="photo-placeholder">EM</div>
       </div>
     </section>
@@ -154,7 +154,7 @@
       <h2 class="section-title">Selected Publications &amp; Projects</h2>
       <ol class="pub-list">
         <li class="pub-item">
-          <div class="pub-preview"><img src="assets/covers/wildfire-cover.gif" alt="Animated wildfire spread prediction cover" width="280" height="180"></div>
+          <div class="pub-preview"><img src="/assets/covers/wildfire-cover.gif" alt="Animated wildfire spread prediction cover" width="280" height="180"></div>
           <div class="pub-info">
             <p class="pub-title">ShearFuse-UNet: Hadamard, DCT, and Shearlet Transform Fusion for Next-Day Wildfire Spread Prediction</p>
             <p class="pub-authors"><strong>Ene Meco</strong>, Yingyi Luo, Emadeldeen Hamdan, Adam Watts, Ahmet Enis Cetin</p>
@@ -166,29 +166,29 @@
           </div>
         </li>
         <li class="pub-item">
-          <div class="pub-preview"><img src="assets/covers/multi-agent-cover.gif" alt="Animated multi-agent learning cover" width="280" height="180"></div>
+          <div class="pub-preview"><img src="/assets/covers/multi-agent-cover.gif" alt="Animated multi-agent learning cover" width="280" height="180"></div>
           <div class="pub-info">
             <p class="pub-title">Single-Agent Poisoning Attacks in Multi-Agent Learning Environments</p>
             <p class="pub-authors"><strong>Ene Meco</strong> &middot; Supervised by Prof. Ermin Wei</p>
             <p class="pub-venue"><em>IDEAL Summer Research &middot; Northwestern University</em>, Jun&ndash;Aug 2026</p>
             <div class="pub-links">
-              <a href="publications.html" class="pub-link">Details</a>
+              <a href="/publications/" class="pub-link">Details</a>
             </div>
           </div>
         </li>
         <li class="pub-item">
-          <div class="pub-preview"><img src="assets/covers/murlan-rl-cover.gif" alt="Animated reinforcement learning card-game cover" width="280" height="180"></div>
+          <div class="pub-preview"><img src="/assets/covers/murlan-rl-cover.gif" alt="Animated reinforcement learning card-game cover" width="280" height="180"></div>
           <div class="pub-info">
             <p class="pub-title">AI Agent for Murlan (Self-Play Reinforcement Learning)</p>
             <p class="pub-authors"><strong>Ene Meco</strong></p>
             <p class="pub-venue"><em>Personal Project</em>, Dec 2025 &middot; PPO, policy-value networks, legal-action masking</p>
             <div class="pub-links">
-              <a href="publications.html" class="pub-link">Details</a>
+              <a href="/publications/" class="pub-link">Details</a>
             </div>
           </div>
         </li>
       </ol>
-      <p class="pubs-cta">See all projects on the <a href="publications.html">projects page</a> or <a href="https://linkedin.com/in/enemeco" target="_blank">LinkedIn</a>.</p>
+      <p class="pubs-cta">See all projects on the <a href="/publications/">projects page</a> or <a href="https://linkedin.com/in/enemeco" target="_blank">LinkedIn</a>.</p>
     </section>
   </main>
 
@@ -203,10 +203,11 @@
   </script>
   <script>
   if (window.location.pathname.endsWith('/index.html')) {
+      const cleanPath = window.location.pathname.replace(/\/index\.html$/, '/') || '/';
       window.history.replaceState(
           {},
           '',
-          window.location.pathname.replace('/index.html', '') +
+          cleanPath +
           window.location.search +
           window.location.hash
       );

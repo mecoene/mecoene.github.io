@@ -3,135 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Projects - Ene Meco</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,300&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
+  <title>Redirecting - Ene Meco</title>
+  <meta http-equiv="refresh" content="0; url=/publications/" />
+  <link rel="canonical" href="/publications/" />
 </head>
 <body>
-  <nav class="navbar">
-    <div class="nav-inner">
-      <a class="nav-brand" href="index.html">Ene Meco</a>
-      <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">☰</button>
-      <ul class="nav-links" id="navLinks">
-        <li><a href="index.html">About</a></li>
-        <li><a href="publications.html" class="active">Projects</a></li>
-        <li><a href="cv.html">CV</a></li>
-      </ul>
-    </div>
-  </nav>
-
-  <main class="container">
-    <div class="page-hero">
-      <h1>Projects</h1>
-      <p>Publications, research, and selected projects across machine learning, multi-agent systems, signal processing, and embedded systems.</p>
-    </div>
-
-    <!-- Research -->
-    <div class="year-group">
-      <p class="year-label">Publications &amp; Research</p>
-      <div class="pubs-section" style="padding-top:0.75rem;">
-        <ol class="pub-list">
-          <li class="pub-item">
-            <div class="pub-preview"><img src="assets/covers/wildfire-cover.gif" alt="Animated wildfire spread prediction cover" width="280" height="180"></div>
-            <div class="pub-info">
-              <p class="pub-title">ShearFuse-UNet: Hadamard, DCT, and Shearlet Transform Fusion for Next-Day Wildfire Spread Prediction</p>
-              <p class="pub-authors"><strong>Ene Meco</strong>, Yingyi Luo, Emadeldeen Hamdan, Adam Watts, Ahmet Enis Cetin</p>
-              <p class="pub-venue"><em>arXiv:2606.14071 [cs.CV]</em>, 2026</p>
-              <p class="pub-desc">A lightweight transform-fusion U-Net for next-day wildfire spread prediction from multi-modal satellite data.</p>
-              <div class="pub-links">
-                <a href="https://arxiv.org/abs/2606.14071" class="pub-link" target="_blank" rel="noopener">arXiv</a>
-                <a href="https://arxiv.org/pdf/2606.14071" class="pub-link" target="_blank" rel="noopener">PDF</a>
-              </div>
-            </div>
-          </li>
-          <li class="pub-item">
-            <div class="pub-preview"><img src="assets/covers/multi-agent-cover.gif" alt="Animated multi-agent learning cover" width="280" height="180"></div>
-            <div class="pub-info">
-              <p class="pub-title">Single-Agent Poisoning Attacks in Multi-Agent Learning Environments</p>
-              <p class="pub-authors"><strong>Ene Meco</strong> &middot; Supervised by Prof. Ermin Wei</p>
-              <p class="pub-venue"><em>IDEAL Summer Research &middot; Northwestern University</em>, Jun&ndash;Aug 2026</p>
-              <p class="pub-desc">Research on mixed-autonomy systems, game theory, and deep learning for multi-agent settings.</p>
-            </div>
-          </li>
-          <li class="pub-item">
-            <div class="pub-preview"><img src="assets/covers/spectral-fpga-cover.gif" alt="Animated FPGA spectral analysis cover" width="280" height="180"></div>
-            <div class="pub-info">
-              <p class="pub-title">Spectral Analysis on FPGA for Detection of Astrophysical Signals</p>
-              <p class="pub-authors"><strong>Ene Meco</strong></p>
-              <p class="pub-venue"><em>Research Intern &middot; Paris Observatory | PSL</em>, Jun&ndash;Jul 2024</p>
-              <p class="pub-desc">Python-based FFT signal processing on Red Pitaya for weak astrophysical signal detection.</p>
-              <div class="pub-links"><a href="assets/rapport-de-stage.pdf" class="pub-link" target="_blank" rel="noopener">Open report</a></div>
-            </div>
-          </li>
-        </ol>
-      </div>
-    </div>
-
-    <!-- Machine Learning and AI -->
-    <div class="year-group">
-      <p class="year-label">Machine Learning &amp; AI Projects</p>
-      <div class="pubs-section" style="padding-top:0.75rem;">
-        <ol class="pub-list">
-          <li class="pub-item">
-            <div class="pub-preview"><img src="assets/covers/recommendation-systems-cover.gif" alt="Animated recommendation systems cover" width="280" height="180"></div>
-            <div class="pub-info">
-              <p class="pub-title">Recommendation Systems with Movie Ratings</p>
-              <p class="pub-authors"><strong>Ene Meco</strong></p>
-              <p class="pub-venue"><em>ECE 491</em>, Throughout Apr 2026</p>
-              <p class="pub-desc">Built and compared recommendation-system approaches using MovieLens ratings, including a popularity baseline, matrix factorization, SVD, and a neural recommender.</p>
-              <div class="pub-links"><a href="assets/recommendation-systems-presentation.pdf" class="pub-link" target="_blank" rel="noopener">Open presentation</a></div>
-            </div>
-          </li>
-          <li class="pub-item">
-            <div class="pub-preview"><img src="assets/covers/murlan-rl-cover.gif" alt="Animated reinforcement learning card-game cover" width="280" height="180"></div>
-            <div class="pub-info">
-              <p class="pub-title">AI Agent for Murlan (Self-Play Reinforcement Learning)</p>
-              <p class="pub-authors"><strong>Ene Meco</strong></p>
-              <p class="pub-venue"><em>Personal Project</em>, Dec 2025</p>
-              <p class="pub-desc">Designed an RL environment and trained a self-play PPO agent with a policy-value network and legal-action masking for a multi-agent Albanian card game.</p>
-            </div>
-          </li>
-          <li class="pub-item">
-            <div class="pub-preview"><img src="assets/covers/balkan-dynamics-cover.gif" alt="Animated Balkan dynamics clustering cover" width="280" height="180"></div>
-            <div class="pub-info">
-              <p class="pub-title">Unveiling Regional Dynamics: A Comparative Study of Balkan Countries in 2023</p>
-              <p class="pub-authors"><strong>Ene Meco</strong></p>
-              <p class="pub-venue"><em>University of Chicago</em>, Mar 2025 &middot; PCA, k-means, unsupervised learning</p>
-              <p class="pub-desc">Applied unsupervised learning to profile Balkan countries based on national characteristics.</p>
-            </div>
-          </li>
-        </ol>
-      </div>
-    </div>
-
-    <!-- Sorbonne -->
-    <div class="year-group">
-      <p class="year-label">Sorbonne Université (2022–2025)</p>
-      <div class="pubs-section" style="padding-top:0.75rem;">
-        <ol class="pub-list">
-          <li class="pub-item">
-            <div class="pub-preview"><img src="assets/covers/heart-rate-cover.gif" alt="Animated heart-rate monitor circuit cover" width="280" height="180"></div>
-            <div class="pub-info">
-              <p class="pub-title">Heart Rate Monitor Circuit</p>
-              <p class="pub-authors"><strong>Ene Meco</strong></p>
-              <p class="pub-venue"><em>Sorbonne University</em>, Apr 2024 &middot; OrCAD PSpice, Raspberry Pi</p>
-              <p class="pub-desc">Simulated the analog and digital circuit blocks, then acquired and processed circuit data to estimate BPM.</p>
-            </div>
-          </li>
-        </ol>
-      </div>
-    </div>
-  </main>
-
-  <footer class="site-footer">
-    <p>© 2026 Ene Meco · Hosted on <a href="https://pages.github.com/" target="_blank">GitHub Pages</a></p>
-  </footer>
+  <p>Redirecting to <a href="/publications/">Projects</a>.</p>
   <script>
-    document.getElementById('navToggle').addEventListener('click', () => {
-      document.getElementById('navLinks').classList.toggle('open');
-    });
+    window.location.replace('/publications/' + window.location.search + window.location.hash);
   </script>
 </body>
 </html>
