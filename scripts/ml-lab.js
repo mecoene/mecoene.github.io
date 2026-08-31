@@ -44,6 +44,577 @@
     }
   };
 
+  const trafficCanvas = $('trafficCanvas');
+  const trafficAutonomy = $('trafficAutonomy');
+  const trafficAutonomyValue = $('trafficAutonomyValue');
+  const trafficDensity = $('trafficDensity');
+  const trafficDensityValue = $('trafficDensityValue');
+  const trafficAttack = $('trafficAttack');
+  const trafficRecovery = $('trafficRecovery');
+  const trafficPause = $('trafficPause');
+  const trafficReset = $('trafficReset');
+  const trafficStatus = $('trafficStatus');
+  const trafficStability = $('trafficStability');
+  const trafficThroughput = $('trafficThroughput');
+  const trafficNearMisses = $('trafficNearMisses');
+  const trafficCollisions = $('trafficCollisions');
+  const trafficWidth = trafficCanvas.width;
+  const trafficHeight = trafficCanvas.height;
+  const trafficCenter = { x: trafficWidth / 2, y: trafficHeight / 2 };
+  const trafficLanes = [
+    { key: 'east', group: 'ew', axis: 'x', sign: 1, x: -54, y: 270, stop: 302, heading: 0 },
+    { key: 'west', group: 'ew', axis: 'x', sign: -1, x: trafficWidth + 54, y: 210, stop: 458, heading: Math.PI },
+    { key: 'south', group: 'ns', axis: 'y', sign: 1, x: 410, y: -54, stop: 162, heading: Math.PI / 2 },
+    { key: 'north', group: 'ns', axis: 'y', sign: -1, x: 350, y: trafficHeight + 54, stop: 318, heading: -Math.PI / 2 },
+  ];
+  const trafficState = {
+    vehicles: [],
+    timers: {},
+    pairCooldowns: new Map(),
+    nextId: 1,
+    time: 0,
+    lastFrame: null,
+    paused: false,
+    poisonId: null,
+    emergencyHold: 0,
+    throughput: 0,
+    nearMisses: 0,
+    collisions: 0,
+    stability: 100,
+  };
+
+  const trafficDistance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+  const trafficDisplayPoint = (vehicle) => (
+    vehicle.lane.axis === 'x'
+      ? { x: vehicle.x, y: vehicle.y + vehicle.lateral }
+      : { x: vehicle.x + vehicle.lateral, y: vehicle.y }
+  );
+
+  const trafficCenterDistance = (vehicle) => trafficDistance(trafficDisplayPoint(vehicle), trafficCenter);
+
+  const trafficSignalGreen = (lane) => {
+    if (trafficState.emergencyHold > 0) return false;
+    const phase = trafficState.time % 10;
+    if (lane.group === 'ew') return phase < 4.6;
+    return phase >= 5 && phase < 9.6;
+  };
+
+  const trafficSignalLabel = (lane) => {
+    if (trafficState.emergencyHold > 0) return 'hold';
+    const phase = trafficState.time % 10;
+    const amber = lane.group === 'ew' ? phase >= 4.6 && phase < 5 : phase >= 9.6;
+    if (amber) return 'amber';
+    return trafficSignalGreen(lane) ? 'green' : 'red';
+  };
+
+  const trafficStopDistance = (vehicle) => {
+    const lane = vehicle.lane;
+    const front = lane.axis === 'x'
+      ? vehicle.x + lane.sign * vehicle.length * 0.5
+      : vehicle.y + lane.sign * vehicle.length * 0.5;
+    return lane.sign > 0 ? lane.stop - front : front - lane.stop;
+  };
+
+  const trafficPassedStop = (vehicle) => trafficStopDistance(vehicle) < -16;
+
+  const trafficInsideIntersection = (vehicle) => {
+    const point = trafficDisplayPoint(vehicle);
+    return point.x > 304 && point.x < 456 && point.y > 164 && point.y < 316;
+  };
+
+  const trafficCanSpawn = (lane) => !trafficState.vehicles.some((vehicle) => (
+    vehicle.lane.key === lane.key
+    && !vehicle.collided
+    && (lane.axis === 'x'
+      ? Math.abs(vehicle.x - lane.x) < 96
+      : Math.abs(vehicle.y - lane.y) < 96)
+  ));
+
+  const makeTrafficVehicle = (lane) => {
+    const autonomous = Math.random() * 100 < Number(trafficAutonomy.value);
+    return {
+      id: trafficState.nextId,
+      lane,
+      x: lane.x,
+      y: lane.y,
+      lateral: 0,
+      speed: 34 + Math.random() * 18,
+      command: 60,
+      baseSpeed: autonomous ? 88 + Math.random() * 10 : 72 + Math.random() * 22,
+      type: autonomous ? 'av' : 'human',
+      length: 32,
+      width: 17,
+      aggression: autonomous ? 0.14 : 0.38 + Math.random() * 0.58,
+      wait: 0,
+      poisoned: false,
+      collided: false,
+      crashTimer: 0,
+    };
+  };
+
+  const pickPoisonedVehicle = () => {
+    const attack = trafficAttack.value;
+    if (attack === 'none') {
+      trafficState.poisonId = null;
+      trafficState.vehicles.forEach((vehicle) => {
+        vehicle.poisoned = false;
+      });
+      return null;
+    }
+
+    const current = trafficState.vehicles.find((vehicle) => vehicle.id === trafficState.poisonId && !vehicle.collided);
+    if (current) return current;
+
+    const moving = trafficState.vehicles.filter((vehicle) => !vehicle.collided && trafficCenterDistance(vehicle) < 290);
+    const autonomous = moving.filter((vehicle) => vehicle.type === 'av');
+    const candidates = autonomous.length ? autonomous : moving;
+    if (!candidates.length) return null;
+
+    const poisoned = candidates[Math.floor(Math.random() * candidates.length)];
+    trafficState.poisonId = poisoned.id;
+    trafficState.vehicles.forEach((vehicle) => {
+      vehicle.poisoned = vehicle.id === poisoned.id;
+    });
+    return poisoned;
+  };
+
+  const resetTraffic = () => {
+    trafficState.vehicles = [];
+    trafficState.timers = {};
+    trafficState.pairCooldowns.clear();
+    trafficState.nextId = 1;
+    trafficState.time = 0;
+    trafficState.lastFrame = null;
+    trafficState.poisonId = null;
+    trafficState.emergencyHold = 0;
+    trafficState.throughput = 0;
+    trafficState.nearMisses = 0;
+    trafficState.collisions = 0;
+    trafficState.stability = 100;
+    trafficLanes.forEach((lane, index) => {
+      trafficState.timers[lane.key] = index * 0.35;
+    });
+  };
+
+  const spawnTraffic = (dt) => {
+    const density = Number(trafficDensity.value) / 100;
+    const baseInterval = 2.45 - density * 1.55;
+    trafficLanes.forEach((lane) => {
+      trafficState.timers[lane.key] -= dt;
+      if (trafficState.timers[lane.key] > 0) return;
+      if (trafficCanSpawn(lane)) {
+        trafficState.vehicles.push(makeTrafficVehicle(lane));
+        trafficState.nextId += 1;
+      }
+      trafficState.timers[lane.key] = baseInterval * (0.78 + Math.random() * 0.68);
+    });
+  };
+
+  const trafficLeaderGap = (vehicle) => {
+    let nearest = Infinity;
+    trafficState.vehicles.forEach((other) => {
+      if (other === vehicle || other.lane.key !== vehicle.lane.key || other.collided) return;
+      const delta = vehicle.lane.axis === 'x'
+        ? (other.x - vehicle.x) * vehicle.lane.sign
+        : (other.y - vehicle.y) * vehicle.lane.sign;
+      if (delta > 0) nearest = Math.min(nearest, delta - vehicle.length);
+    });
+    return nearest;
+  };
+
+  const applyTrafficRecovery = (vehicle, targetSpeed, poisoned) => {
+    const mode = trafficRecovery.value;
+    if (mode === 'none' || !poisoned || vehicle.poisoned) return targetSpeed;
+
+    const distance = trafficDistance(trafficDisplayPoint(vehicle), trafficDisplayPoint(poisoned));
+    const poisonedActive = trafficCenterDistance(poisoned) < 190 || trafficInsideIntersection(poisoned);
+    if (mode === 'hold' && poisonedActive) {
+      trafficState.emergencyHold = Math.max(trafficState.emergencyHold, 0.85);
+      if (!trafficPassedStop(vehicle) && trafficStopDistance(vehicle) < 185) return 0;
+    }
+
+    if (mode === 'cooperative') {
+      if (vehicle.type === 'av' && (distance < 150 || (poisonedActive && trafficStopDistance(vehicle) < 165))) {
+        return Math.min(targetSpeed, Math.max(0, distance - 52) * 0.85);
+      }
+      if (vehicle.type === 'human' && distance < 88) {
+        return Math.min(targetSpeed, 28);
+      }
+    }
+
+    return targetSpeed;
+  };
+
+  const updateTrafficVehicle = (vehicle, dt, poisoned) => {
+    if (vehicle.collided) {
+      vehicle.crashTimer -= dt;
+      return;
+    }
+
+    const attack = trafficAttack.value;
+    let targetSpeed = vehicle.baseSpeed;
+    let lateralTarget = 0;
+    const stopDistance = trafficStopDistance(vehicle);
+    const obeySignal = !(vehicle.poisoned && attack === 'signal');
+    const redSignal = !trafficSignalGreen(vehicle.lane) && !trafficPassedStop(vehicle);
+
+    if (redSignal && obeySignal && stopDistance < 138) {
+      const humanRisk = vehicle.type === 'human' && vehicle.aggression > 0.88 && stopDistance < 42;
+      if (!humanRisk) targetSpeed = Math.min(targetSpeed, Math.max(0, stopDistance * 1.45));
+    }
+
+    const leaderGap = trafficLeaderGap(vehicle);
+    if (leaderGap < 92) {
+      const gapLimit = vehicle.type === 'av' ? 1.55 : 1.18;
+      targetSpeed = Math.min(targetSpeed, Math.max(0, (leaderGap - 20) * gapLimit));
+    }
+
+    if (vehicle.poisoned && attack === 'brake' && trafficCenterDistance(vehicle) < 240) {
+      targetSpeed = Math.min(targetSpeed, trafficState.time % 1.25 < 0.78 ? 0 : 34);
+    }
+
+    if (vehicle.poisoned && attack === 'signal') {
+      targetSpeed = Math.max(targetSpeed, 104);
+    }
+
+    if (vehicle.poisoned && attack === 'drift' && trafficCenterDistance(vehicle) < 255) {
+      lateralTarget = Math.sin(trafficState.time * 4.2 + vehicle.id) * 21;
+      targetSpeed = Math.max(targetSpeed, 86);
+    }
+
+    targetSpeed = applyTrafficRecovery(vehicle, targetSpeed, poisoned);
+
+    const reaction = vehicle.type === 'av' ? 7.5 : 3.15;
+    vehicle.command += (targetSpeed - vehicle.command) * Math.min(1, dt * reaction);
+    const accel = vehicle.command > vehicle.speed ? (vehicle.type === 'av' ? 78 : 52) : (vehicle.type === 'av' ? 160 : 92);
+    vehicle.speed += clamp(vehicle.command - vehicle.speed, -accel * dt, accel * dt);
+    vehicle.speed = Math.max(0, vehicle.speed);
+    vehicle.lateral += (lateralTarget - vehicle.lateral) * Math.min(1, dt * 4.5);
+
+    const distance = vehicle.speed * dt * vehicle.lane.sign;
+    if (vehicle.lane.axis === 'x') vehicle.x += distance;
+    else vehicle.y += distance;
+    if (vehicle.speed < 6 && targetSpeed < 12) vehicle.wait += dt;
+  };
+
+  const updateTrafficInteractions = (dt) => {
+    trafficState.pairCooldowns.forEach((time, key) => {
+      const next = time - dt;
+      if (next <= 0) trafficState.pairCooldowns.delete(key);
+      else trafficState.pairCooldowns.set(key, next);
+    });
+
+    for (let i = 0; i < trafficState.vehicles.length; i += 1) {
+      const first = trafficState.vehicles[i];
+      if (first.collided) continue;
+      const firstPoint = trafficDisplayPoint(first);
+
+      for (let j = i + 1; j < trafficState.vehicles.length; j += 1) {
+        const second = trafficState.vehicles[j];
+        if (second.collided) continue;
+        const secondPoint = trafficDisplayPoint(second);
+        const distance = trafficDistance(firstPoint, secondPoint);
+        if (distance > 48) continue;
+
+        const key = first.id < second.id ? `${first.id}-${second.id}` : `${second.id}-${first.id}`;
+        if (trafficState.pairCooldowns.has(key)) continue;
+        const crossing = first.lane.group !== second.lane.group;
+        const closeFollowing = first.lane.key === second.lane.key && distance < 28;
+
+        if (distance < 20 || (crossing && distance < 24)) {
+          trafficState.collisions += 1;
+          first.collided = true;
+          second.collided = true;
+          first.crashTimer = 1.35;
+          second.crashTimer = 1.35;
+          first.speed = 0;
+          second.speed = 0;
+          trafficState.emergencyHold = Math.max(trafficState.emergencyHold, 1.25);
+          trafficState.pairCooldowns.set(key, 1.8);
+        } else if (crossing || closeFollowing) {
+          trafficState.nearMisses += 1;
+          if (trafficRecovery.value === 'hold') trafficState.emergencyHold = Math.max(trafficState.emergencyHold, 0.75);
+          trafficState.pairCooldowns.set(key, 1.45);
+        }
+      }
+    }
+  };
+
+  const vehicleHasExited = (vehicle) => (
+    vehicle.lane.axis === 'x'
+      ? (vehicle.lane.sign > 0 ? vehicle.x > trafficWidth + 62 : vehicle.x < -62)
+      : (vehicle.lane.sign > 0 ? vehicle.y > trafficHeight + 62 : vehicle.y < -62)
+  );
+
+  const updateTrafficMetrics = () => {
+    const waitPenalty = trafficState.vehicles.reduce((sum, vehicle) => sum + Math.min(vehicle.wait, 7), 0) * 0.82;
+    const activePenalty = Math.max(0, trafficState.vehicles.length - 10) * 0.55;
+    const score = 100 - trafficState.collisions * 17 - trafficState.nearMisses * 2.8 - waitPenalty - activePenalty;
+    trafficState.stability = Math.round(clamp(score, 0, 100));
+
+    trafficAutonomyValue.value = `${trafficAutonomy.value}%`;
+    trafficDensityValue.value = `${trafficDensity.value}%`;
+    trafficStability.textContent = `${trafficState.stability}%`;
+    trafficThroughput.textContent = String(trafficState.throughput);
+    trafficNearMisses.textContent = String(trafficState.nearMisses);
+    trafficCollisions.textContent = String(trafficState.collisions);
+
+    if (trafficState.paused) {
+      trafficStatus.textContent = 'Paused';
+    } else if (trafficAttack.value === 'none') {
+      trafficStatus.textContent = 'Stable flow';
+    } else if (trafficRecovery.value === 'none') {
+      trafficStatus.textContent = 'Attack destabilizing';
+    } else {
+      trafficStatus.textContent = trafficState.stability < 58 ? 'Recovering control' : 'Recovery active';
+    }
+  };
+
+  const stepTraffic = (dt) => {
+    trafficState.time += dt;
+    trafficState.emergencyHold = Math.max(0, trafficState.emergencyHold - dt);
+    spawnTraffic(dt);
+    const poisoned = pickPoisonedVehicle();
+    trafficState.vehicles.forEach((vehicle) => updateTrafficVehicle(vehicle, dt, poisoned));
+    updateTrafficInteractions(dt);
+    trafficState.vehicles = trafficState.vehicles.filter((vehicle) => {
+      if (vehicle.collided) return vehicle.crashTimer > 0;
+      if (vehicleHasExited(vehicle)) {
+        trafficState.throughput += 1;
+        if (vehicle.id === trafficState.poisonId) trafficState.poisonId = null;
+        return false;
+      }
+      return true;
+    });
+    updateTrafficMetrics();
+  };
+
+  const roundedRect = (ctx, x, y, width, height, radius) => {
+    const r = Math.min(radius, Math.abs(width) / 2, Math.abs(height) / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  };
+
+  const drawTrafficRoads = (ctx, vars) => {
+    const isLight = root.dataset.theme === 'light';
+    const road = isLight ? '#f1f2f4' : '#151518';
+    const roadEdge = isLight ? '#d6d7dc' : '#29242a';
+    const laneLine = isLight ? 'rgba(17, 17, 17, .22)' : 'rgba(255, 255, 255, .18)';
+
+    drawCanvasGrid(ctx, trafficWidth, trafficHeight, 38);
+    ctx.fillStyle = road;
+    ctx.fillRect(0, 174, trafficWidth, 132);
+    ctx.fillRect(314, 0, 132, trafficHeight);
+    ctx.strokeStyle = roadEdge;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-1, 174, trafficWidth + 2, 132);
+    ctx.strokeRect(314, -1, 132, trafficHeight + 2);
+
+    ctx.fillStyle = isLight ? '#fff' : '#111113';
+    ctx.fillRect(314, 174, 132, 132);
+    ctx.strokeStyle = vars.border;
+    ctx.strokeRect(314, 174, 132, 132);
+
+    ctx.save();
+    ctx.setLineDash([18, 14]);
+    ctx.strokeStyle = laneLine;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, trafficCenter.y);
+    ctx.lineTo(314, trafficCenter.y);
+    ctx.moveTo(446, trafficCenter.y);
+    ctx.lineTo(trafficWidth, trafficCenter.y);
+    ctx.moveTo(trafficCenter.x, 0);
+    ctx.lineTo(trafficCenter.x, 174);
+    ctx.moveTo(trafficCenter.x, 306);
+    ctx.lineTo(trafficCenter.x, trafficHeight);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.strokeStyle = vars.accent;
+    ctx.globalAlpha = 0.75;
+    ctx.lineWidth = 2;
+    [[302, 174, 302, 306], [458, 174, 458, 306], [314, 162, 446, 162], [314, 318, 446, 318]].forEach((line) => {
+      ctx.beginPath();
+      ctx.moveTo(line[0], line[1]);
+      ctx.lineTo(line[2], line[3]);
+      ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = laneLine;
+    for (let offset = -36; offset <= 36; offset += 18) {
+      ctx.fillRect(292, 184 + offset + 58, 4, 9);
+      ctx.fillRect(464, 184 + offset + 58, 4, 9);
+      ctx.fillRect(324 + offset + 58, 152, 9, 4);
+      ctx.fillRect(324 + offset + 58, 324, 9, 4);
+    }
+  };
+
+  const drawTrafficLight = (ctx, x, y, label) => {
+    const color = label === 'green' ? '#22c55e' : label === 'amber' ? '#f59e0b' : '#e11d48';
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,.28)';
+    roundedRect(ctx, x - 9, y - 9, 18, 18, 5);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, y, 5.6, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 10;
+    ctx.fill();
+    ctx.restore();
+  };
+
+  const drawTrafficVehicle = (ctx, vehicle, vars) => {
+    const point = trafficDisplayPoint(vehicle);
+    const isAv = vehicle.type === 'av';
+    const baseColor = vehicle.poisoned ? '#fb365f' : isAv ? '#38bdf8' : vars.textMuted;
+    const trimColor = vehicle.poisoned ? '#fff1f2' : isAv ? '#083344' : vars.canvas;
+
+    if (isAv && !vehicle.collided) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, vehicle.poisoned ? 50 : 34, 0, Math.PI * 2);
+      ctx.strokeStyle = vehicle.poisoned ? 'rgba(251, 54, 95, .28)' : 'rgba(56, 189, 248, .18)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (vehicle.poisoned) {
+      ctx.save();
+      const pulse = 42 + Math.sin(trafficState.time * 6) * 7;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, pulse, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(251, 54, 95, .34)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.save();
+    ctx.translate(point.x, point.y);
+    ctx.rotate(vehicle.lane.heading);
+    ctx.fillStyle = baseColor;
+    ctx.strokeStyle = vehicle.collided ? '#fff' : 'rgba(0,0,0,.28)';
+    ctx.lineWidth = vehicle.poisoned ? 2.5 : 1.4;
+    roundedRect(ctx, -vehicle.length / 2, -vehicle.width / 2, vehicle.length, vehicle.width, 4);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = trimColor;
+    roundedRect(ctx, 2, -vehicle.width / 2 + 3, 8, vehicle.width - 6, 2);
+    ctx.fill();
+    ctx.fillStyle = vehicle.poisoned ? '#070708' : '#fff';
+    ctx.font = '8px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(vehicle.poisoned ? '!' : isAv ? 'A' : 'H', -4, 0);
+
+    if (vehicle.collided) {
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-10, -7);
+      ctx.lineTo(10, 7);
+      ctx.moveTo(10, -7);
+      ctx.lineTo(-10, 7);
+      ctx.stroke();
+    }
+    ctx.restore();
+  };
+
+  const drawTraffic = () => {
+    const ctx = trafficCanvas.getContext('2d');
+    const vars = getVars();
+    drawTrafficRoads(ctx, vars);
+
+    const ew = trafficSignalLabel(trafficLanes[0]);
+    const ns = trafficSignalLabel(trafficLanes[2]);
+    drawTrafficLight(ctx, 292, 322, ew);
+    drawTrafficLight(ctx, 468, 158, ew);
+    drawTrafficLight(ctx, 294, 158, ns);
+    drawTrafficLight(ctx, 468, 322, ns);
+
+    const poisoned = trafficState.vehicles.find((vehicle) => vehicle.poisoned && !vehicle.collided);
+    if (poisoned && trafficRecovery.value === 'cooperative') {
+      const point = trafficDisplayPoint(poisoned);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 124, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(56, 189, 248, .22)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 8]);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (trafficState.emergencyHold > 0) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(225, 29, 72, .12)';
+      ctx.fillRect(314, 174, 132, 132);
+      ctx.strokeStyle = 'rgba(251, 54, 95, .5)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(314, 174, 132, 132);
+      ctx.restore();
+    }
+
+    trafficState.vehicles.forEach((vehicle) => drawTrafficVehicle(ctx, vehicle, vars));
+  };
+
+  const runTrafficFrame = (now) => {
+    if (trafficState.lastFrame === null) trafficState.lastFrame = now;
+    const dt = Math.min((now - trafficState.lastFrame) / 1000, 0.05);
+    trafficState.lastFrame = now;
+    if (!trafficState.paused) stepTraffic(dt);
+    drawTraffic();
+    requestAnimationFrame(runTrafficFrame);
+  };
+
+  const updateTrafficControls = () => {
+    trafficAutonomyValue.value = `${trafficAutonomy.value}%`;
+    trafficDensityValue.value = `${trafficDensity.value}%`;
+  };
+
+  [trafficAutonomy, trafficDensity].forEach((control) => {
+    control.addEventListener('input', updateTrafficControls);
+    control.addEventListener('change', updateTrafficControls);
+  });
+
+  trafficAttack.addEventListener('change', () => {
+    trafficState.poisonId = null;
+    trafficState.vehicles.forEach((vehicle) => {
+      vehicle.poisoned = false;
+    });
+  });
+
+  trafficPause.addEventListener('click', () => {
+    trafficState.paused = !trafficState.paused;
+    trafficPause.textContent = trafficState.paused ? 'Resume' : 'Pause';
+    updateTrafficMetrics();
+    drawTraffic();
+  });
+
+  trafficReset.addEventListener('click', () => {
+    const wasPaused = trafficState.paused;
+    resetTraffic();
+    trafficState.paused = wasPaused;
+    trafficPause.textContent = trafficState.paused ? 'Resume' : 'Pause';
+    updateTrafficMetrics();
+    drawTraffic();
+  });
+
   const clusterCanvas = $('clusterCanvas');
   const clusterAlgorithm = $('clusterAlgorithm');
   const clusterK = $('clusterK');
@@ -980,10 +1551,16 @@
   });
 
   new MutationObserver(() => {
+    drawTraffic();
     drawClusters();
     drawConvolution();
   }).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
 
+  resetTraffic();
+  updateTrafficControls();
+  updateTrafficMetrics();
+  drawTraffic();
+  requestAnimationFrame(runTrafficFrame);
   seedClusterPoints();
   renderKernelGrid();
   resetConvGrid();

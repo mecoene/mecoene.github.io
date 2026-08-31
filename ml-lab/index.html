@@ -53,10 +53,71 @@
   <main class="container lab-container">
     <div class="page-hero lab-hero">
       <h1>ML Lab</h1>
-      <p>Clustering &middot; Convolution &middot; DCT Compression &middot; kNN Upscaling</p>
+      <p>Multi-Agent Traffic &middot; Clustering &middot; Convolution &middot; DCT Compression &middot; kNN Upscaling</p>
     </div>
 
     <div class="lab-stack">
+      <section class="lab-tool traffic-tool" aria-labelledby="traffic-title">
+        <div class="lab-tool-header">
+          <h2 id="traffic-title">Multi-Agent Traffic Lab</h2>
+          <p class="lab-status" id="trafficStatus">Stable flow</p>
+        </div>
+        <div class="lab-workspace traffic-workspace">
+          <div class="traffic-stage">
+            <canvas class="lab-canvas traffic-canvas" id="trafficCanvas" width="760" height="480" aria-label="Mixed-autonomy intersection simulation"></canvas>
+            <div class="traffic-metrics" aria-label="Traffic simulation metrics">
+              <div>
+                <span>Stability</span>
+                <strong id="trafficStability">100%</strong>
+              </div>
+              <div>
+                <span>Throughput</span>
+                <strong id="trafficThroughput">0</strong>
+              </div>
+              <div>
+                <span>Near Misses</span>
+                <strong id="trafficNearMisses">0</strong>
+              </div>
+              <div>
+                <span>Collisions</span>
+                <strong id="trafficCollisions">0</strong>
+              </div>
+            </div>
+          </div>
+          <div class="lab-controls">
+            <label class="lab-field">
+              <span>Autonomous Share <output id="trafficAutonomyValue">55%</output></span>
+              <input id="trafficAutonomy" type="range" min="0" max="100" value="55" />
+            </label>
+            <label class="lab-field">
+              <span>Density <output id="trafficDensityValue">60%</output></span>
+              <input id="trafficDensity" type="range" min="25" max="100" value="60" />
+            </label>
+            <label class="lab-field">
+              <span>Attack</span>
+              <select id="trafficAttack">
+                <option value="none">None</option>
+                <option value="brake">Poisoned Brake</option>
+                <option value="signal">Signal Ignore</option>
+                <option value="drift">Sensor Drift</option>
+              </select>
+            </label>
+            <label class="lab-field">
+              <span>Recovery</span>
+              <select id="trafficRecovery">
+                <option value="cooperative">Cooperative Shield</option>
+                <option value="hold">Intersection Hold</option>
+                <option value="none">No Recovery</option>
+              </select>
+            </label>
+            <div class="lab-button-row">
+              <button class="lab-button" id="trafficPause" type="button">Pause</button>
+              <button class="lab-button lab-button-secondary" id="trafficReset" type="button">Reset</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="lab-tool" aria-labelledby="clustering-title">
         <div class="lab-tool-header">
           <h2 id="clustering-title">Clustering Simulator</h2>
