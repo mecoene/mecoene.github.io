@@ -695,7 +695,7 @@ a:hover { color: var(--accent-hot); text-decoration: underline; }
 }
 
 .parking-sensor-canvas {
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 4 / 3;
   image-rendering: pixelated;
 }
 

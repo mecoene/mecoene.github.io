@@ -158,12 +158,20 @@
             </div>
             <div class="parking-sensors">
               <div>
-                <p class="lab-panel-label">Sensor</p>
-                <canvas class="lab-canvas parking-sensor-canvas" id="parkingSensor" width="96" height="96" aria-label="Parallel parking sensor view"></canvas>
+                <p class="lab-panel-label">Front POV</p>
+                <canvas class="lab-canvas parking-sensor-canvas" id="parkingFrontSensor" width="128" height="96" aria-label="Front parking sensor point of view"></canvas>
               </div>
               <div>
-                <p class="lab-panel-label">DCT</p>
-                <canvas class="lab-canvas parking-sensor-canvas" id="parkingDct" width="96" height="96" aria-label="DCT compressed parking sensor view"></canvas>
+                <p class="lab-panel-label">Front DCT Error 3/24</p>
+                <canvas class="lab-canvas parking-sensor-canvas" id="parkingFrontDct" width="128" height="96" aria-label="Front parking DCT error map"></canvas>
+              </div>
+              <div>
+                <p class="lab-panel-label">Rear POV</p>
+                <canvas class="lab-canvas parking-sensor-canvas" id="parkingRearSensor" width="128" height="96" aria-label="Rear parking sensor point of view"></canvas>
+              </div>
+              <div>
+                <p class="lab-panel-label">Rear DCT Error 3/24</p>
+                <canvas class="lab-canvas parking-sensor-canvas" id="parkingRearDct" width="128" height="96" aria-label="Rear parking DCT error map"></canvas>
               </div>
             </div>
           </div>
@@ -179,10 +187,7 @@
               <span>Training Episodes <output id="parkingTrainValue">60</output></span>
               <input id="parkingTrainEpisodes" type="range" min="20" max="140" step="10" value="60" />
             </label>
-            <label class="lab-field">
-              <span>DCT Coefficients <output id="parkingDctValue">12/64</output></span>
-              <input id="parkingDctKeep" type="range" min="1" max="64" value="12" />
-            </label>
+
             <label class="lab-field">
               <span>Steering <output id="parkingSteerValue">0 deg</output></span>
               <input id="parkingSteer" type="range" min="-35" max="35" value="0" />

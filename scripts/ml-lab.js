@@ -1464,11 +1464,11 @@
   });
 
   const parkingCanvas = $('parkingCanvas');
-  const parkingSensor = $('parkingSensor');
-  const parkingDct = $('parkingDct');
+  const parkingFrontSensor = $('parkingFrontSensor');
+  const parkingFrontDct = $('parkingFrontDct');
+  const parkingRearSensor = $('parkingRearSensor');
+  const parkingRearDct = $('parkingRearDct');
   const parkingMode = $('parkingMode');
-  const parkingDctKeep = $('parkingDctKeep');
-  const parkingDctValue = $('parkingDctValue');
   const parkingTrainEpisodes = $('parkingTrainEpisodes');
   const parkingTrainValue = $('parkingTrainValue');
   const parkingSteer = $('parkingSteer');
@@ -1491,6 +1491,7 @@
   const parkingCarLength = 66;
   const parkingCarWidth = 32;
   const parkingWheelbase = 48;
+  const parkingPovDctBudget = Object.freeze({ keep: 3, total: 24 });
   const parkingTarget = { x: 365, y: 128, angle: 0 };
   const parkingParkedCars = [];
   const parkingScenarioTypes = [
@@ -1575,18 +1576,22 @@
   const radiansToDegrees = (angle) => Math.round((angle * 180) / Math.PI);
   const parkingScenarioLabel = () => (parkingState.scenario ? `${parkingState.scenario.label} spot` : 'Parking spot');
 
-  const pickParkingScenarioType = () => {
-    const roll = Math.random();
+  const pickParkingScenarioType = (previousLabel = '') => {
+    const options = previousLabel
+      ? parkingScenarioTypes.filter((type) => type.label !== previousLabel)
+      : parkingScenarioTypes;
+    const totalChance = options.reduce((total, type) => total + type.chance, 0);
+    const roll = Math.random() * totalChance;
     let cutoff = 0;
-    for (const type of parkingScenarioTypes) {
+    for (const type of options) {
       cutoff += type.chance;
       if (roll <= cutoff) return type;
     }
-    return parkingScenarioTypes[1];
+    return options[0] || parkingScenarioTypes[1];
   };
 
   const createParkingScenario = () => {
-    const type = pickParkingScenarioType();
+    const type = pickParkingScenarioType(parkingState.scenario && parkingState.scenario.label);
     const gap = Math.round(randomRange(type.gapRange));
     let targetX = Math.round(randomRange([315, 410]));
     if (parkingState.scenario && Math.abs(targetX - parkingState.scenario.targetX) < 28) {
@@ -1733,6 +1738,7 @@
   const parkingCollision = () => parkingCollisionForCar(parkingState.car);
   const parkingDistanceForCar = (car) => Math.hypot(car.x - parkingTarget.x, car.y - parkingTarget.y);
   const parkingAngleErrorForCar = (car) => Math.abs(wrapAngle(car.angle - parkingTarget.angle));
+  const parkingCenterlinePenalty = (car) => Math.max(0, car.y - parkingTarget.y);
   const parkingIsParked = (car) => parkingDistanceForCar(car) < 13 && parkingAngleErrorForCar(car) < 0.1;
   const parkingDistanceToTarget = () => parkingDistanceForCar(parkingState.car);
 
@@ -1805,6 +1811,7 @@
     reward -= distance * 0.01;
     reward -= Math.abs(radiansToDegrees(angle)) * 0.07;
     reward -= Math.abs(car.speed) * 0.012;
+    reward -= parkingCenterlinePenalty(car) * 0.018;
     reward -= 0.35;
     if (didCollide) reward -= 260;
     if (didPark) reward += 520;
@@ -1857,7 +1864,7 @@
 
     const distance = parkingDistanceForCar(car);
     const angle = parkingAngleErrorForCar(car);
-    score += clamp(160 - distance * 0.75 - Math.abs(radiansToDegrees(angle)) * 1.8, -180, 160);
+    score += clamp(160 - distance * 0.75 - Math.abs(radiansToDegrees(angle)) * 1.8 - parkingCenterlinePenalty(car) * 0.55, -180, 160);
     score += parked ? 80 : -40;
     score -= collisions * 120;
     return { score, policy, parked, collisions, distance, angle, steps: step + 1 };
@@ -1927,7 +1934,6 @@
   };
 
   const updateParkingControls = () => {
-    parkingDctValue.value = `${parkingDctKeep.value}/64`;
     parkingTrainValue.value = parkingTrainEpisodes.value;
     parkingSteerValue.value = `${parkingSteer.value} deg`;
     parkingThrottleValue.value = `${parkingThrottle.value}%`;
@@ -2101,33 +2107,128 @@
     ctx.stroke();
     ctx.restore();
 
-    drawParkingSensor();
+    drawParkingSensors();
   };
 
-  const drawParkingSensor = () => {
+  const parkingPovPoint = (point, origin, angle, width, height) => {
+    const forward = { x: Math.cos(angle), y: Math.sin(angle) };
+    const right = { x: -Math.sin(angle), y: Math.cos(angle) };
+    const dx = point.x - origin.x;
+    const dy = point.y - origin.y;
+    const depth = dx * forward.x + dy * forward.y;
+    const lateral = dx * right.x + dy * right.y;
+    const range = 230;
+    const scale = height / range;
+    return {
+      x: width / 2 + lateral * scale,
+      y: height - depth * scale,
+      depth,
+    };
+  };
+
+  const drawParkingPovLine = (ctx, points, origin, angle, width, height) => {
+    const projected = points.map((point) => parkingPovPoint(point, origin, angle, width, height));
+    if (projected.every((point) => point.depth < -12 || point.depth > 240)) return;
+    ctx.beginPath();
+    projected.forEach((point, index) => {
+      const x = clamp(point.x, -width * 0.4, width * 1.4);
+      const y = clamp(point.y, -height * 0.4, height * 1.4);
+      if (index === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  };
+
+  const drawParkingPovPolygon = (ctx, points, origin, angle, width, height, fill, stroke) => {
+    const projected = points.map((point) => parkingPovPoint(point, origin, angle, width, height));
+    if (projected.every((point) => point.depth < -12 || point.depth > 240)) return;
+    ctx.beginPath();
+    projected.forEach((point, index) => {
+      const x = clamp(point.x, -width * 0.45, width * 1.45);
+      const y = clamp(point.y, -height * 0.45, height * 1.45);
+      if (index === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.strokeStyle = stroke;
+    ctx.fill();
+    ctx.stroke();
+  };
+
+  const drawParkingPov = (sensorCanvas, dctCanvas, reverse = false) => {
     const sourceCanvas = document.createElement('canvas');
-    sourceCanvas.width = 96;
+    sourceCanvas.width = 128;
     sourceCanvas.height = 96;
     const ctx = sourceCanvas.getContext('2d');
+    const width = sourceCanvas.width;
+    const height = sourceCanvas.height;
     const vars = getVars();
-    const scale = 96 / 220;
-    ctx.fillStyle = vars.canvas;
-    ctx.fillRect(0, 0, sourceCanvas.width, sourceCanvas.height);
-    ctx.save();
-    ctx.translate(48, 52);
-    ctx.rotate(-parkingState.car.angle);
-    ctx.translate(-parkingState.car.x * scale, -parkingState.car.y * scale);
-    drawParkingLot(ctx, vars, scale);
-    parkingParkedCars.forEach((parked) => {
-      drawParkingRect(ctx, { ...parked, x: parked.x * scale, y: parked.y * scale }, parked.length * scale, parked.width * scale, '#71717a', vars.border);
-    });
-    drawParkingRect(ctx, { ...parkingTarget, x: parkingTarget.x * scale, y: parkingTarget.y * scale }, parkingCarLength * scale, parkingCarWidth * scale, 'rgba(34, 197, 94, .16)', '#22c55e');
-    drawParkingRect(ctx, { x: parkingState.car.x * scale, y: parkingState.car.y * scale, angle: parkingState.car.angle }, parkingCarLength * scale, parkingCarWidth * scale, '#38bdf8', '#083344');
-    ctx.restore();
+    const isLight = root.dataset.theme === 'light';
+    const car = parkingState.car;
+    const direction = reverse ? -1 : 1;
+    const angle = car.angle + (reverse ? Math.PI : 0);
+    const origin = {
+      x: car.x + Math.cos(car.angle) * parkingCarLength * 0.52 * direction,
+      y: car.y + Math.sin(car.angle) * parkingCarLength * 0.52 * direction,
+    };
 
-    const sensorData = ctx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
-    putImageData(parkingSensor, sensorData);
-    putImageData(parkingDct, compressDct(sensorData, Number(parkingDctKeep.value)).reconstruction);
+    ctx.fillStyle = vars.canvas;
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = isLight ? '#f5f6f8' : '#151518';
+    ctx.fillRect(0, 0, width, height);
+    ctx.strokeStyle = isLight ? 'rgba(17, 17, 17, .16)' : 'rgba(255, 255, 255, .16)';
+    ctx.lineWidth = 1;
+    for (let depth = 42; depth <= 210; depth += 42) {
+      const y = height - depth * (height / 230);
+      ctx.beginPath();
+      ctx.moveTo(8, y);
+      ctx.lineTo(width - 8, y);
+      ctx.stroke();
+    }
+    for (let offset = -80; offset <= 80; offset += 40) {
+      ctx.beginPath();
+      ctx.moveTo(width / 2 + offset * 0.1, height);
+      ctx.lineTo(width / 2 + offset * (height / 230), 0);
+      ctx.stroke();
+    }
+
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = isLight ? '#c6c9cf' : '#343038';
+    drawParkingPovLine(ctx, [{ x: 54, y: 78 }, { x: 706, y: 78 }], origin, angle, width, height);
+    drawParkingPovLine(ctx, [{ x: 54, y: 342 }, { x: 706, y: 342 }], origin, angle, width, height);
+    ctx.setLineDash([7, 6]);
+    ctx.strokeStyle = isLight ? 'rgba(17, 17, 17, .25)' : 'rgba(255, 255, 255, .22)';
+    drawParkingPovLine(ctx, [{ x: 64, y: 248 }, { x: 696, y: 248 }], origin, angle, width, height);
+    ctx.setLineDash([]);
+
+    const scenario = parkingState.scenario || { gap: 190, color: vars.accent };
+    const slotHeight = 64;
+    const slotCorners = [
+      { x: parkingTarget.x - scenario.gap / 2, y: parkingTarget.y - slotHeight / 2 },
+      { x: parkingTarget.x + scenario.gap / 2, y: parkingTarget.y - slotHeight / 2 },
+      { x: parkingTarget.x + scenario.gap / 2, y: parkingTarget.y + slotHeight / 2 },
+      { x: parkingTarget.x - scenario.gap / 2, y: parkingTarget.y + slotHeight / 2 },
+    ];
+    drawParkingPovPolygon(ctx, slotCorners, origin, angle, width, height, 'rgba(34, 197, 94, .1)', scenario.color || vars.accent);
+    parkingParkedCars.forEach((parked) => {
+      drawParkingPovPolygon(ctx, parkingCarCorners(parked, parked.length, parked.width), origin, angle, width, height, '#71717a', vars.border);
+    });
+
+    ctx.fillStyle = reverse ? '#fb365f' : '#38bdf8';
+    roundedRect(ctx, width / 2 - 22, height - 13, 44, 10, 3);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255, 255, 255, .74)';
+    ctx.fillRect(width / 2 - 2, height - 18, 4, 12);
+
+    const sensorData = ctx.getImageData(0, 0, width, height);
+    putImageData(sensorCanvas, sensorData);
+    putImageData(dctCanvas, compressDct(sensorData, parkingPovDctBudget.keep).error);
+  };
+
+  const drawParkingSensors = () => {
+    drawParkingPov(parkingFrontSensor, parkingFrontDct, false);
+    drawParkingPov(parkingRearSensor, parkingRearDct, true);
   };
 
   const runParkingFrame = (now) => {
@@ -2143,7 +2244,7 @@
     requestAnimationFrame(runParkingFrame);
   };
 
-  [parkingMode, parkingDctKeep, parkingTrainEpisodes, parkingSteer, parkingThrottle].forEach((control) => {
+  [parkingMode, parkingTrainEpisodes, parkingSteer, parkingThrottle].forEach((control) => {
     control.addEventListener('input', updateParkingControls);
     control.addEventListener('change', updateParkingControls);
   });
