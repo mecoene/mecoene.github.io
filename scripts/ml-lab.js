@@ -1469,14 +1469,19 @@
   const parkingMode = $('parkingMode');
   const parkingDctKeep = $('parkingDctKeep');
   const parkingDctValue = $('parkingDctValue');
+  const parkingTrainEpisodes = $('parkingTrainEpisodes');
+  const parkingTrainValue = $('parkingTrainValue');
   const parkingSteer = $('parkingSteer');
   const parkingSteerValue = $('parkingSteerValue');
   const parkingThrottle = $('parkingThrottle');
   const parkingThrottleValue = $('parkingThrottleValue');
+  const parkingTrain = $('parkingTrain');
   const parkingPause = $('parkingPause');
   const parkingReset = $('parkingReset');
   const parkingStatus = $('parkingStatus');
   const parkingReward = $('parkingReward');
+  const parkingEpisodeReward = $('parkingEpisodeReward');
+  const parkingBestReward = $('parkingBestReward');
   const parkingDistance = $('parkingDistance');
   const parkingAngle = $('parkingAngle');
   const parkingCollisions = $('parkingCollisions');
@@ -1490,32 +1495,93 @@
     { x: 245, y: 128, angle: 0, length: 76, width: 34, color: '#71717a' },
     { x: 515, y: 128, angle: 0, length: 76, width: 34, color: '#71717a' },
   ];
+  const parkingInitialCar = () => ({
+    x: 612,
+    y: 252,
+    angle: 0,
+    speed: 0,
+    steer: 0,
+    throttle: 0,
+    collided: false,
+  });
+  const parkingDefaultPolicy = Object.freeze({
+    phase1X: 520,
+    phase2X: 410,
+    phase2Y: 145,
+    phase1Steer: -0.38,
+    phase1Throttle: -0.45,
+    phase2Steer: 0.24,
+    phase2Throttle: -0.38,
+    finalThrottleGain: 0.018,
+    finalMinThrottle: -0.22,
+    finalMaxThrottle: 0.24,
+    finalAngleGain: 1.4,
+    finalYGain: 0.008,
+    finalMaxSteer: 0.45,
+  });
+  const parkingPolicyRanges = {
+    phase1X: [495, 555],
+    phase2X: [385, 450],
+    phase2Y: [132, 168],
+    phase1Steer: [-0.55, -0.24],
+    phase1Throttle: [-0.62, -0.32],
+    phase2Steer: [0.1, 0.45],
+    phase2Throttle: [-0.55, -0.24],
+    finalThrottleGain: [0.01, 0.028],
+    finalMinThrottle: [-0.34, -0.12],
+    finalMaxThrottle: [0.12, 0.34],
+    finalAngleGain: [0.7, 2.1],
+    finalYGain: [0.003, 0.016],
+    finalMaxSteer: [0.3, 0.58],
+  };
+  const cloneParkingPolicy = (policy) => ({ ...policy });
+  const randomRange = ([min, max]) => min + Math.random() * (max - min);
+  const normalizeParkingPolicy = (policy) => {
+    const next = cloneParkingPolicy(policy);
+    Object.entries(parkingPolicyRanges).forEach(([key, [min, max]]) => {
+      next[key] = clamp(next[key], min, max);
+    });
+    next.phase2X = Math.min(next.phase2X, next.phase1X - 65);
+    return next;
+  };
+  const sampleParkingPolicy = () => normalizeParkingPolicy(Object.fromEntries(
+    Object.entries(parkingPolicyRanges).map(([key, range]) => [key, randomRange(range)]),
+  ));
+  const mutateParkingPolicy = (policy, intensity = 1) => {
+    const next = cloneParkingPolicy(policy);
+    Object.entries(parkingPolicyRanges).forEach(([key, [min, max]]) => {
+      const span = max - min;
+      next[key] += (Math.random() * 2 - 1) * span * 0.2 * intensity;
+    });
+    return normalizeParkingPolicy(next);
+  };
   const parkingState = {
     car: null,
     phase: 0,
     reward: 0,
+    episodeReward: 0,
+    bestReward: null,
     collisions: 0,
     steps: 0,
+    episodesTrained: 0,
+    trainProgress: 0,
+    trainGoal: 0,
     paused: false,
     parked: false,
+    training: false,
     lastFrame: null,
+    policy: cloneParkingPolicy(parkingDefaultPolicy),
+    bestPolicy: cloneParkingPolicy(parkingDefaultPolicy),
   };
 
   const wrapAngle = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
   const radiansToDegrees = (angle) => Math.round((angle * 180) / Math.PI);
 
   const resetParking = () => {
-    parkingState.car = {
-      x: 612,
-      y: 252,
-      angle: 0,
-      speed: 0,
-      steer: 0,
-      throttle: 0,
-      collided: false,
-    };
+    parkingState.car = parkingInitialCar();
     parkingState.phase = 0;
     parkingState.reward = 0;
+    parkingState.episodeReward = 0;
     parkingState.collisions = 0;
     parkingState.steps = 0;
     parkingState.parked = false;
@@ -1570,8 +1636,8 @@
     });
   };
 
-  const parkingCollision = () => {
-    const carCorners = parkingCarCorners(parkingState.car);
+  const parkingCollisionForCar = (car) => {
+    const carCorners = parkingCarCorners(car);
     const curbHit = carCorners.some((corner) => corner.y < 78 || corner.y > 342 || corner.x < 55 || corner.x > 705);
     const parkedHit = parkingParkedCars.some((parked) => (
       polygonsOverlap(carCorners, parkingCarCorners(parked, parked.length, parked.width))
@@ -1579,35 +1645,51 @@
     return curbHit || parkedHit;
   };
 
-  const parkingDistanceToTarget = () => Math.hypot(parkingState.car.x - parkingTarget.x, parkingState.car.y - parkingTarget.y);
+  const parkingCollision = () => parkingCollisionForCar(parkingState.car);
+  const parkingDistanceForCar = (car) => Math.hypot(car.x - parkingTarget.x, car.y - parkingTarget.y);
+  const parkingAngleErrorForCar = (car) => Math.abs(wrapAngle(car.angle - parkingTarget.angle));
+  const parkingIsParked = (car) => parkingDistanceForCar(car) < 13 && parkingAngleErrorForCar(car) < 0.1;
+  const parkingDistanceToTarget = () => parkingDistanceForCar(parkingState.car);
 
-  const parkingPolicyAction = () => {
-    const car = parkingState.car;
-    const distance = parkingDistanceToTarget();
+  const parkingPolicyActionFor = (car, policy = parkingState.policy) => {
+    const distance = parkingDistanceForCar(car);
     const angleError = wrapAngle(car.angle - parkingTarget.angle);
     let throttle = -0.55;
     let steer = 0;
+    let phase = 1;
+    let parked = false;
 
-    if (car.x > 520) {
-      parkingState.phase = 1;
-      steer = -0.38;
-      throttle = -0.45;
-    } else if (car.x > 410 || car.y > 145) {
-      parkingState.phase = 2;
-      steer = 0.24;
-      throttle = -0.38;
+    if (car.x > policy.phase1X) {
+      phase = 1;
+      steer = policy.phase1Steer;
+      throttle = policy.phase1Throttle;
+    } else if (car.x > policy.phase2X || car.y > policy.phase2Y) {
+      phase = 2;
+      steer = policy.phase2Steer;
+      throttle = policy.phase2Throttle;
     } else {
-      parkingState.phase = 3;
-      throttle = clamp((parkingTarget.x - car.x) * 0.018, -0.22, 0.24);
-      steer = clamp(angleError * 1.4 + (parkingTarget.y - car.y) * 0.008, -0.45, 0.45);
+      phase = 3;
+      throttle = clamp((parkingTarget.x - car.x) * policy.finalThrottleGain, policy.finalMinThrottle, policy.finalMaxThrottle);
+      steer = clamp(
+        angleError * policy.finalAngleGain + (parkingTarget.y - car.y) * policy.finalYGain,
+        -policy.finalMaxSteer,
+        policy.finalMaxSteer,
+      );
       if (distance < 13 && Math.abs(angleError) < 0.1) {
         throttle = 0;
         steer = -angleError * 0.7;
-        parkingState.parked = true;
+        parked = true;
       }
     }
 
-    return { throttle, steer };
+    return { throttle, steer, phase, parked };
+  };
+
+  const parkingPolicyAction = () => {
+    const action = parkingPolicyActionFor(parkingState.car, parkingState.policy);
+    parkingState.phase = action.phase;
+    if (action.parked) parkingState.parked = true;
+    return action;
   };
 
   const parkingManualAction = () => ({
@@ -1615,13 +1697,159 @@
     steer: (Number(parkingSteer.value) * Math.PI) / 180,
   });
 
+  const applyParkingAction = (car, action, dt) => {
+    const maxSteer = (35 * Math.PI) / 180;
+    const targetSpeed = action.throttle * 94;
+    car.throttle = action.throttle;
+    car.steer += (clamp(action.steer, -maxSteer, maxSteer) - car.steer) * Math.min(1, dt * 5.2);
+    car.speed += (targetSpeed - car.speed) * Math.min(1, dt * 3.8);
+    car.x += Math.cos(car.angle) * car.speed * dt;
+    car.y += Math.sin(car.angle) * car.speed * dt;
+    car.angle = wrapAngle(car.angle + (car.speed / parkingWheelbase) * Math.tan(car.steer) * dt);
+  };
+
+  const parkingStepReward = (car, previousDistance, previousAngle, didCollide, didPark) => {
+    const distance = parkingDistanceForCar(car);
+    const angle = parkingAngleErrorForCar(car);
+    const distanceProgress = previousDistance - distance;
+    const angleProgress = previousAngle - angle;
+    let reward = distanceProgress * 0.85 + angleProgress * 45;
+    reward -= distance * 0.01;
+    reward -= Math.abs(radiansToDegrees(angle)) * 0.07;
+    reward -= Math.abs(car.speed) * 0.012;
+    reward -= 0.35;
+    if (didCollide) reward -= 260;
+    if (didPark) reward += 520;
+    return reward;
+  };
+
+  const formatParkingReward = (value) => {
+    const rounded = Math.round(value);
+    return rounded > 0 ? `+${rounded}` : String(rounded);
+  };
+
+  const paintParkingReward = (element, value) => {
+    element.classList.toggle('reward-positive', value > 0);
+    element.classList.toggle('reward-negative', value < 0);
+  };
+
+  const simulateParkingPolicy = (policy) => {
+    const car = parkingInitialCar();
+    const dt = 1 / 30;
+    const maxSteps = 360;
+    let score = 0;
+    let collisions = 0;
+    let parked = false;
+    let step = 0;
+
+    for (; step < maxSteps; step += 1) {
+      const previousDistance = parkingDistanceForCar(car);
+      const previousAngle = parkingAngleErrorForCar(car);
+      const action = parkingPolicyActionFor(car, policy);
+      applyParkingAction(car, action, dt);
+
+      const didCollide = parkingCollisionForCar(car);
+      if (didCollide) {
+        collisions += 1;
+        car.collided = true;
+        car.speed = 0;
+        car.throttle = 0;
+      }
+
+      const didPark = !didCollide && (action.parked || parkingIsParked(car));
+      if (didPark) {
+        parked = true;
+        car.speed = 0;
+        car.throttle = 0;
+      }
+
+      score += parkingStepReward(car, previousDistance, previousAngle, didCollide, didPark);
+      if (didCollide || didPark) break;
+    }
+
+    const distance = parkingDistanceForCar(car);
+    const angle = parkingAngleErrorForCar(car);
+    score += clamp(160 - distance * 0.75 - Math.abs(radiansToDegrees(angle)) * 1.8, -180, 160);
+    score += parked ? 80 : -40;
+    score -= collisions * 120;
+    return { score, policy, parked, collisions, distance, angle, steps: step + 1 };
+  };
+
+  const trainParkingPolicy = () => {
+    if (parkingState.training) return;
+    const totalEpisodes = Number(parkingTrainEpisodes.value);
+    const wasPaused = parkingState.paused;
+    parkingState.training = true;
+    parkingState.paused = true;
+    parkingState.trainProgress = 0;
+    parkingState.trainGoal = totalEpisodes;
+    parkingMode.value = 'policy';
+
+    let bestPolicy = cloneParkingPolicy(parkingState.bestPolicy || parkingState.policy);
+    let bestResult = simulateParkingPolicy(bestPolicy);
+    if (parkingState.bestReward !== null && parkingState.bestReward > bestResult.score) {
+      bestResult = { ...bestResult, score: parkingState.bestReward };
+    }
+
+    const runBatch = () => {
+      const batchSize = 8;
+      for (let index = 0; index < batchSize && parkingState.trainProgress < totalEpisodes; index += 1) {
+        const progress = parkingState.trainProgress / Math.max(1, totalEpisodes);
+        const intensity = Math.max(0.25, 1 - progress);
+        const candidate = parkingState.trainProgress === 0
+          ? cloneParkingPolicy(parkingState.policy)
+          : Math.random() < 0.18
+            ? sampleParkingPolicy()
+            : mutateParkingPolicy(bestPolicy, intensity);
+        const result = simulateParkingPolicy(candidate);
+        if (result.score > bestResult.score) {
+          bestResult = result;
+          bestPolicy = cloneParkingPolicy(candidate);
+        }
+        parkingState.trainProgress += 1;
+      }
+
+      parkingState.bestReward = Math.round(bestResult.score);
+      parkingState.bestPolicy = cloneParkingPolicy(bestPolicy);
+      parkingBestReward.textContent = formatParkingReward(parkingState.bestReward);
+      paintParkingReward(parkingBestReward, parkingState.bestReward);
+      parkingStatus.textContent = `Training ${parkingState.trainProgress}/${totalEpisodes}`;
+      updateParkingControls();
+
+      if (parkingState.trainProgress < totalEpisodes) {
+        window.setTimeout(runBatch, 0);
+        return;
+      }
+
+      parkingState.policy = cloneParkingPolicy(bestPolicy);
+      parkingState.episodesTrained += totalEpisodes;
+      parkingState.training = false;
+      parkingState.paused = wasPaused;
+      resetParking();
+      parkingPause.textContent = parkingState.paused ? 'Resume' : 'Pause';
+      updateParkingControls();
+      updateParkingMetrics();
+      parkingStatus.textContent = `Trained ${totalEpisodes} episodes`;
+      drawParking();
+    };
+
+    updateParkingControls();
+    runBatch();
+  };
+
   const updateParkingControls = () => {
     parkingDctValue.value = `${parkingDctKeep.value}/64`;
+    parkingTrainValue.value = parkingTrainEpisodes.value;
     parkingSteerValue.value = `${parkingSteer.value} deg`;
     parkingThrottleValue.value = `${parkingThrottle.value}%`;
     const manual = parkingMode.value === 'manual';
-    parkingSteer.disabled = !manual;
-    parkingThrottle.disabled = !manual;
+    parkingSteer.disabled = !manual || parkingState.training;
+    parkingThrottle.disabled = !manual || parkingState.training;
+    parkingTrainEpisodes.disabled = parkingState.training;
+    parkingMode.disabled = parkingState.training;
+    parkingTrain.disabled = parkingState.training;
+    parkingPause.disabled = parkingState.training;
+    parkingReset.disabled = parkingState.training;
   };
 
   const stepParking = (dt) => {
@@ -1631,39 +1859,51 @@
       return;
     }
 
+    const previousDistance = parkingDistanceForCar(car);
+    const previousAngle = parkingAngleErrorForCar(car);
     const action = parkingMode.value === 'manual' ? parkingManualAction() : parkingPolicyAction();
-    const maxSteer = (35 * Math.PI) / 180;
-    const targetSpeed = action.throttle * 94;
-    car.throttle = action.throttle;
-    car.steer += (clamp(action.steer, -maxSteer, maxSteer) - car.steer) * Math.min(1, dt * 5.2);
-    car.speed += (targetSpeed - car.speed) * Math.min(1, dt * 3.8);
-    car.x += Math.cos(car.angle) * car.speed * dt;
-    car.y += Math.sin(car.angle) * car.speed * dt;
-    car.angle = wrapAngle(car.angle + (car.speed / parkingWheelbase) * Math.tan(car.steer) * dt);
+    applyParkingAction(car, action, dt);
     parkingState.steps += 1;
 
-    if (parkingCollision()) {
+    const didCollide = parkingCollision();
+    if (didCollide) {
       car.collided = true;
       car.speed = 0;
       car.throttle = 0;
       parkingState.collisions += 1;
     }
+
+    const didPark = !didCollide && (action.parked || parkingIsParked(car));
+    if (didPark) {
+      parkingState.parked = true;
+      car.speed = 0;
+      car.throttle = 0;
+    }
+
+    const reward = parkingStepReward(car, previousDistance, previousAngle, didCollide, didPark);
+    parkingState.reward = Math.round(reward);
+    parkingState.episodeReward += reward;
   };
 
   const updateParkingMetrics = () => {
     const distance = parkingDistanceToTarget();
-    const angleError = Math.abs(wrapAngle(parkingState.car.angle - parkingTarget.angle));
-    const speedPenalty = Math.abs(parkingState.car.speed) * 0.08;
-    const reward = clamp(100 - distance * 0.62 - radiansToDegrees(angleError) * 0.9 - speedPenalty - parkingState.collisions * 120, -120, 100);
-    parkingState.reward = Math.round(reward);
-    parkingReward.textContent = String(parkingState.reward);
+    const angleError = parkingAngleErrorForCar(parkingState.car);
+    const episodeReward = Math.round(parkingState.episodeReward);
+    parkingReward.textContent = formatParkingReward(parkingState.reward);
+    parkingEpisodeReward.textContent = formatParkingReward(episodeReward);
+    parkingBestReward.textContent = parkingState.bestReward === null ? '--' : formatParkingReward(parkingState.bestReward);
     parkingDistance.textContent = `${Math.round(distance)} px`;
     parkingAngle.textContent = `${Math.abs(radiansToDegrees(angleError))} deg`;
     parkingCollisions.textContent = String(parkingState.collisions);
+    paintParkingReward(parkingReward, parkingState.reward);
+    paintParkingReward(parkingEpisodeReward, episodeReward);
+    if (parkingState.bestReward !== null) paintParkingReward(parkingBestReward, parkingState.bestReward);
 
-    if (parkingState.paused) parkingStatus.textContent = 'Paused';
+    if (parkingState.training) parkingStatus.textContent = `Training ${parkingState.trainProgress}/${parkingState.trainGoal}`;
+    else if (parkingState.paused) parkingStatus.textContent = 'Paused';
     else if (parkingState.car.collided) parkingStatus.textContent = 'Collision';
     else if (parkingState.parked) parkingStatus.textContent = 'Parked';
+    else if (parkingState.episodesTrained > 0 && parkingState.steps === 0) parkingStatus.textContent = `Trained ${parkingState.episodesTrained} episodes`;
     else parkingStatus.textContent = parkingMode.value === 'manual' ? 'Manual control' : `Policy phase ${parkingState.phase || 1}`;
 
     if (parkingMode.value !== 'manual') {
@@ -1790,7 +2030,7 @@
     requestAnimationFrame(runParkingFrame);
   };
 
-  [parkingMode, parkingDctKeep, parkingSteer, parkingThrottle].forEach((control) => {
+  [parkingMode, parkingDctKeep, parkingTrainEpisodes, parkingSteer, parkingThrottle].forEach((control) => {
     control.addEventListener('input', updateParkingControls);
     control.addEventListener('change', updateParkingControls);
   });
@@ -1799,6 +2039,8 @@
     updateParkingControls();
     updateParkingMetrics();
   });
+
+  parkingTrain.addEventListener('click', trainParkingPolicy);
 
   parkingPause.addEventListener('click', () => {
     parkingState.paused = !parkingState.paused;

@@ -128,8 +128,16 @@
             <canvas class="lab-canvas parking-canvas" id="parkingCanvas" width="760" height="430" aria-label="Parallel parking reinforcement learning demo"></canvas>
             <div class="parking-metrics" aria-label="Parallel parking metrics">
               <div>
-                <span>Reward</span>
+                <span>Step Reward</span>
                 <strong id="parkingReward">0</strong>
+              </div>
+              <div>
+                <span>Episode Reward</span>
+                <strong id="parkingEpisodeReward">0</strong>
+              </div>
+              <div>
+                <span>Best Policy</span>
+                <strong id="parkingBestReward">--</strong>
               </div>
               <div>
                 <span>Distance</span>
@@ -164,6 +172,10 @@
               </select>
             </label>
             <label class="lab-field">
+              <span>Training Episodes <output id="parkingTrainValue">60</output></span>
+              <input id="parkingTrainEpisodes" type="range" min="20" max="140" step="10" value="60" />
+            </label>
+            <label class="lab-field">
               <span>DCT Coefficients <output id="parkingDctValue">12/64</output></span>
               <input id="parkingDctKeep" type="range" min="1" max="64" value="12" />
             </label>
@@ -176,12 +188,14 @@
               <input id="parkingThrottle" type="range" min="-100" max="100" value="0" />
             </label>
             <div class="lab-button-row">
+              <button class="lab-button" id="parkingTrain" type="button">Train</button>
               <button class="lab-button" id="parkingPause" type="button">Pause</button>
               <button class="lab-button lab-button-secondary" id="parkingReset" type="button">Reset</button>
             </div>
           </div>
         </div>
       </section>
+
       <section class="lab-tool" aria-labelledby="clustering-title">
         <div class="lab-tool-header">
           <h2 id="clustering-title">Clustering Simulator</h2>

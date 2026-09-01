@@ -716,8 +716,15 @@ a:hover { color: var(--accent-hot); text-decoration: underline; }
 .traffic-metrics,
 .parking-metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.55rem;
+}
+
+.traffic-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.parking-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .traffic-metrics div,
@@ -745,6 +752,14 @@ a:hover { color: var(--accent-hot); text-decoration: underline; }
   line-height: 1.25;
   margin-top: 0.14rem;
   font-variant-numeric: tabular-nums;
+}
+
+.parking-metrics strong.reward-positive {
+  color: #22c55e;
+}
+
+.parking-metrics strong.reward-negative {
+  color: #fb365f;
 }
 
 .lab-field {
@@ -819,6 +834,7 @@ a:hover { color: var(--accent-hot); text-decoration: underline; }
   text-decoration: none;
   transform: translateY(-1px);
 }
+
 
 .lab-button:disabled,
 .lab-button:disabled:hover {
