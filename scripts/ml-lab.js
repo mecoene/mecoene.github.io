@@ -64,8 +64,8 @@
   const trafficLanes = [
     { key: 'east', group: 'ew', axis: 'x', sign: 1, x: -54, y: 270, stop: 302, heading: 0 },
     { key: 'west', group: 'ew', axis: 'x', sign: -1, x: trafficWidth + 54, y: 210, stop: 458, heading: Math.PI },
-    { key: 'south', group: 'ns', axis: 'y', sign: 1, x: 410, y: -54, stop: 162, heading: Math.PI / 2 },
-    { key: 'north', group: 'ns', axis: 'y', sign: -1, x: 350, y: trafficHeight + 54, stop: 318, heading: -Math.PI / 2 },
+    { key: 'south', group: 'ns', axis: 'y', sign: 1, x: 350, y: -54, stop: 162, heading: Math.PI / 2 },
+    { key: 'north', group: 'ns', axis: 'y', sign: -1, x: 410, y: trafficHeight + 54, stop: 318, heading: -Math.PI / 2 },
   ];
   const trafficState = {
     vehicles: [],
@@ -89,6 +89,35 @@
     vehicle.lane.axis === 'x'
       ? { x: vehicle.x, y: vehicle.y + vehicle.lateral }
       : { x: vehicle.x + vehicle.lateral, y: vehicle.y }
+  );
+
+  const trafficVehicleBounds = (vehicle, x = vehicle.x, y = vehicle.y, lateral = vehicle.lateral) => {
+    const point = vehicle.lane.axis === 'x'
+      ? { x, y: y + lateral }
+      : { x: x + lateral, y };
+    const halfLength = vehicle.length / 2;
+    const halfWidth = vehicle.width / 2;
+
+    return vehicle.lane.axis === 'x'
+      ? {
+        left: point.x - halfLength,
+        right: point.x + halfLength,
+        top: point.y - halfWidth,
+        bottom: point.y + halfWidth,
+      }
+      : {
+        left: point.x - halfWidth,
+        right: point.x + halfWidth,
+        top: point.y - halfLength,
+        bottom: point.y + halfLength,
+      };
+  };
+
+  const trafficBoxesTouch = (first, second) => (
+    first.left <= second.right
+    && first.right >= second.left
+    && first.top <= second.bottom
+    && first.bottom >= second.top
   );
 
   const trafficCenterDistance = (vehicle) => trafficDistance(trafficDisplayPoint(vehicle), trafficCenter);
@@ -292,9 +321,20 @@
     vehicle.speed = Math.max(0, vehicle.speed);
     vehicle.lateral += (lateralTarget - vehicle.lateral) * Math.min(1, dt * 4.5);
 
-    const distance = vehicle.speed * dt * vehicle.lane.sign;
-    if (vehicle.lane.axis === 'x') vehicle.x += distance;
-    else vehicle.y += distance;
+    let moveDistance = vehicle.speed * dt;
+    const blockingGap = trafficLeaderGap(vehicle);
+    if (Number.isFinite(blockingGap)) {
+      const maxMove = Math.max(0, blockingGap - 0.75);
+      if (moveDistance > maxMove) {
+        moveDistance = maxMove;
+        vehicle.speed = maxMove / Math.max(dt, 0.001);
+        vehicle.command = Math.min(vehicle.command, vehicle.speed);
+      }
+    }
+
+    const signedDistance = moveDistance * vehicle.lane.sign;
+    if (vehicle.lane.axis === 'x') vehicle.x += signedDistance;
+    else vehicle.y += signedDistance;
     if (vehicle.speed < 6 && targetSpeed < 12) vehicle.wait += dt;
   };
 
@@ -309,20 +349,23 @@
       const first = trafficState.vehicles[i];
       if (first.collided) continue;
       const firstPoint = trafficDisplayPoint(first);
+      const firstBounds = trafficVehicleBounds(first);
 
       for (let j = i + 1; j < trafficState.vehicles.length; j += 1) {
         const second = trafficState.vehicles[j];
         if (second.collided) continue;
         const secondPoint = trafficDisplayPoint(second);
+        const secondBounds = trafficVehicleBounds(second);
+        const touching = trafficBoxesTouch(firstBounds, secondBounds);
         const distance = trafficDistance(firstPoint, secondPoint);
-        if (distance > 48) continue;
+        if (!touching && distance > 48) continue;
 
         const key = first.id < second.id ? `${first.id}-${second.id}` : `${second.id}-${first.id}`;
         if (trafficState.pairCooldowns.has(key)) continue;
         const crossing = first.lane.group !== second.lane.group;
         const closeFollowing = first.lane.key === second.lane.key && distance < 28;
 
-        if (distance < 20 || (crossing && distance < 24)) {
+        if (touching || distance < 20 || (crossing && distance < 24)) {
           trafficState.collisions += 1;
           first.collided = true;
           second.collided = true;
