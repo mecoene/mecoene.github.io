@@ -643,11 +643,13 @@ a:hover { color: var(--accent-hot); text-decoration: underline; }
   align-items: start;
 }
 
-.traffic-workspace {
+.traffic-workspace,
+.parking-workspace {
   grid-template-columns: minmax(0, 1fr) 280px;
 }
 
-.traffic-stage {
+.traffic-stage,
+.parking-stage {
   display: grid;
   gap: 0.75rem;
   min-width: 0;
@@ -682,6 +684,21 @@ a:hover { color: var(--accent-hot); text-decoration: underline; }
   aspect-ratio: 19 / 12;
 }
 
+.parking-canvas {
+  aspect-ratio: 76 / 43;
+}
+
+.parking-sensors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.parking-sensor-canvas {
+  aspect-ratio: 1 / 1;
+  image-rendering: pixelated;
+}
+
 .conv-canvas {
   aspect-ratio: 1 / 1;
 }
@@ -696,13 +713,15 @@ a:hover { color: var(--accent-hot); text-decoration: underline; }
   align-content: start;
 }
 
-.traffic-metrics {
+.traffic-metrics,
+.parking-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.55rem;
 }
 
-.traffic-metrics div {
+.traffic-metrics div,
+.parking-metrics div {
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -710,14 +729,16 @@ a:hover { color: var(--accent-hot); text-decoration: underline; }
   padding: 0.58rem 0.65rem;
 }
 
-.traffic-metrics span {
+.traffic-metrics span,
+.parking-metrics span {
   display: block;
   color: var(--text-muted);
   font-size: 0.68rem;
   line-height: 1.2;
 }
 
-.traffic-metrics strong {
+.traffic-metrics strong,
+.parking-metrics strong {
   display: block;
   color: var(--heading);
   font-size: 1rem;
@@ -912,7 +933,9 @@ a:hover { color: var(--accent-hot); text-decoration: underline; }
 }
 
 @media (max-width: 640px) {
-  .traffic-metrics {
+  .traffic-metrics,
+  .parking-metrics,
+  .parking-sensors {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

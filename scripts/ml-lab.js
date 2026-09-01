@@ -1463,6 +1463,358 @@
     downloadCanvasPng(dctOutput, filename);
   });
 
+  const parkingCanvas = $('parkingCanvas');
+  const parkingSensor = $('parkingSensor');
+  const parkingDct = $('parkingDct');
+  const parkingMode = $('parkingMode');
+  const parkingDctKeep = $('parkingDctKeep');
+  const parkingDctValue = $('parkingDctValue');
+  const parkingSteer = $('parkingSteer');
+  const parkingSteerValue = $('parkingSteerValue');
+  const parkingThrottle = $('parkingThrottle');
+  const parkingThrottleValue = $('parkingThrottleValue');
+  const parkingPause = $('parkingPause');
+  const parkingReset = $('parkingReset');
+  const parkingStatus = $('parkingStatus');
+  const parkingReward = $('parkingReward');
+  const parkingDistance = $('parkingDistance');
+  const parkingAngle = $('parkingAngle');
+  const parkingCollisions = $('parkingCollisions');
+  const parkingWidth = parkingCanvas.width;
+  const parkingHeight = parkingCanvas.height;
+  const parkingCarLength = 66;
+  const parkingCarWidth = 32;
+  const parkingWheelbase = 48;
+  const parkingTarget = { x: 365, y: 128, angle: 0 };
+  const parkingParkedCars = [
+    { x: 245, y: 128, angle: 0, length: 76, width: 34, color: '#71717a' },
+    { x: 515, y: 128, angle: 0, length: 76, width: 34, color: '#71717a' },
+  ];
+  const parkingState = {
+    car: null,
+    phase: 0,
+    reward: 0,
+    collisions: 0,
+    steps: 0,
+    paused: false,
+    parked: false,
+    lastFrame: null,
+  };
+
+  const wrapAngle = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
+  const radiansToDegrees = (angle) => Math.round((angle * 180) / Math.PI);
+
+  const resetParking = () => {
+    parkingState.car = {
+      x: 612,
+      y: 252,
+      angle: 0,
+      speed: 0,
+      steer: 0,
+      throttle: 0,
+      collided: false,
+    };
+    parkingState.phase = 0;
+    parkingState.reward = 0;
+    parkingState.collisions = 0;
+    parkingState.steps = 0;
+    parkingState.parked = false;
+    parkingState.lastFrame = null;
+    parkingSteer.value = '0';
+    parkingThrottle.value = '0';
+  };
+
+  const parkingCarCorners = (car, length = parkingCarLength, width = parkingCarWidth) => {
+    const cos = Math.cos(car.angle);
+    const sin = Math.sin(car.angle);
+    const halfLength = length / 2;
+    const halfWidth = width / 2;
+    return [
+      { x: -halfLength, y: -halfWidth },
+      { x: halfLength, y: -halfWidth },
+      { x: halfLength, y: halfWidth },
+      { x: -halfLength, y: halfWidth },
+    ].map((point) => ({
+      x: car.x + point.x * cos - point.y * sin,
+      y: car.y + point.x * sin + point.y * cos,
+    }));
+  };
+
+  const polygonProjection = (points, axis) => {
+    let min = Infinity;
+    let max = -Infinity;
+    points.forEach((point) => {
+      const value = point.x * axis.x + point.y * axis.y;
+      min = Math.min(min, value);
+      max = Math.max(max, value);
+    });
+    return { min, max };
+  };
+
+  const polygonsOverlap = (first, second) => {
+    const axes = [];
+    [first, second].forEach((points) => {
+      for (let index = 0; index < points.length; index += 1) {
+        const current = points[index];
+        const next = points[(index + 1) % points.length];
+        const edge = { x: next.x - current.x, y: next.y - current.y };
+        const length = Math.hypot(edge.x, edge.y) || 1;
+        axes.push({ x: -edge.y / length, y: edge.x / length });
+      }
+    });
+
+    return axes.every((axis) => {
+      const a = polygonProjection(first, axis);
+      const b = polygonProjection(second, axis);
+      return a.max >= b.min && b.max >= a.min;
+    });
+  };
+
+  const parkingCollision = () => {
+    const carCorners = parkingCarCorners(parkingState.car);
+    const curbHit = carCorners.some((corner) => corner.y < 78 || corner.y > 342 || corner.x < 55 || corner.x > 705);
+    const parkedHit = parkingParkedCars.some((parked) => (
+      polygonsOverlap(carCorners, parkingCarCorners(parked, parked.length, parked.width))
+    ));
+    return curbHit || parkedHit;
+  };
+
+  const parkingDistanceToTarget = () => Math.hypot(parkingState.car.x - parkingTarget.x, parkingState.car.y - parkingTarget.y);
+
+  const parkingPolicyAction = () => {
+    const car = parkingState.car;
+    const distance = parkingDistanceToTarget();
+    const angleError = wrapAngle(car.angle - parkingTarget.angle);
+    let throttle = -0.55;
+    let steer = 0;
+
+    if (car.x > 520) {
+      parkingState.phase = 1;
+      steer = -0.38;
+      throttle = -0.45;
+    } else if (car.x > 410 || car.y > 145) {
+      parkingState.phase = 2;
+      steer = 0.24;
+      throttle = -0.38;
+    } else {
+      parkingState.phase = 3;
+      throttle = clamp((parkingTarget.x - car.x) * 0.018, -0.22, 0.24);
+      steer = clamp(angleError * 1.4 + (parkingTarget.y - car.y) * 0.008, -0.45, 0.45);
+      if (distance < 13 && Math.abs(angleError) < 0.1) {
+        throttle = 0;
+        steer = -angleError * 0.7;
+        parkingState.parked = true;
+      }
+    }
+
+    return { throttle, steer };
+  };
+
+  const parkingManualAction = () => ({
+    throttle: Number(parkingThrottle.value) / 100,
+    steer: (Number(parkingSteer.value) * Math.PI) / 180,
+  });
+
+  const updateParkingControls = () => {
+    parkingDctValue.value = `${parkingDctKeep.value}/64`;
+    parkingSteerValue.value = `${parkingSteer.value} deg`;
+    parkingThrottleValue.value = `${parkingThrottle.value}%`;
+    const manual = parkingMode.value === 'manual';
+    parkingSteer.disabled = !manual;
+    parkingThrottle.disabled = !manual;
+  };
+
+  const stepParking = (dt) => {
+    const car = parkingState.car;
+    if (car.collided || parkingState.parked) {
+      car.speed *= Math.max(0, 1 - dt * 4);
+      return;
+    }
+
+    const action = parkingMode.value === 'manual' ? parkingManualAction() : parkingPolicyAction();
+    const maxSteer = (35 * Math.PI) / 180;
+    const targetSpeed = action.throttle * 94;
+    car.throttle = action.throttle;
+    car.steer += (clamp(action.steer, -maxSteer, maxSteer) - car.steer) * Math.min(1, dt * 5.2);
+    car.speed += (targetSpeed - car.speed) * Math.min(1, dt * 3.8);
+    car.x += Math.cos(car.angle) * car.speed * dt;
+    car.y += Math.sin(car.angle) * car.speed * dt;
+    car.angle = wrapAngle(car.angle + (car.speed / parkingWheelbase) * Math.tan(car.steer) * dt);
+    parkingState.steps += 1;
+
+    if (parkingCollision()) {
+      car.collided = true;
+      car.speed = 0;
+      car.throttle = 0;
+      parkingState.collisions += 1;
+    }
+  };
+
+  const updateParkingMetrics = () => {
+    const distance = parkingDistanceToTarget();
+    const angleError = Math.abs(wrapAngle(parkingState.car.angle - parkingTarget.angle));
+    const speedPenalty = Math.abs(parkingState.car.speed) * 0.08;
+    const reward = clamp(100 - distance * 0.62 - radiansToDegrees(angleError) * 0.9 - speedPenalty - parkingState.collisions * 120, -120, 100);
+    parkingState.reward = Math.round(reward);
+    parkingReward.textContent = String(parkingState.reward);
+    parkingDistance.textContent = `${Math.round(distance)} px`;
+    parkingAngle.textContent = `${Math.abs(radiansToDegrees(angleError))} deg`;
+    parkingCollisions.textContent = String(parkingState.collisions);
+
+    if (parkingState.paused) parkingStatus.textContent = 'Paused';
+    else if (parkingState.car.collided) parkingStatus.textContent = 'Collision';
+    else if (parkingState.parked) parkingStatus.textContent = 'Parked';
+    else parkingStatus.textContent = parkingMode.value === 'manual' ? 'Manual control' : `Policy phase ${parkingState.phase || 1}`;
+
+    if (parkingMode.value !== 'manual') {
+      parkingSteer.value = String(radiansToDegrees(parkingState.car.steer));
+      parkingThrottle.value = String(Math.round(parkingState.car.throttle * 100));
+    }
+    updateParkingControls();
+  };
+
+  const drawParkingRect = (ctx, car, length, width, fill, stroke = 'rgba(0,0,0,.25)') => {
+    ctx.save();
+    ctx.translate(car.x, car.y);
+    ctx.rotate(car.angle);
+    ctx.fillStyle = fill;
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 1.5;
+    roundedRect(ctx, -length / 2, -width / 2, length, width, 5);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.78)';
+    roundedRect(ctx, length * 0.08, -width / 2 + 4, length * 0.25, width - 8, 2);
+    ctx.fill();
+    ctx.restore();
+  };
+
+  const drawParkingLot = (ctx, vars, scale = 1) => {
+    const isLight = root.dataset.theme === 'light';
+    const road = isLight ? '#f4f5f7' : '#151518';
+    const curb = isLight ? '#d8dade' : '#302b31';
+    const line = isLight ? 'rgba(17, 17, 17, .24)' : 'rgba(255, 255, 255, .2)';
+    ctx.fillStyle = vars.canvas;
+    ctx.fillRect(0, 0, parkingWidth * scale, parkingHeight * scale);
+    ctx.fillStyle = road;
+    ctx.fillRect(52 * scale, 78 * scale, 656 * scale, 264 * scale);
+    ctx.fillStyle = curb;
+    ctx.fillRect(52 * scale, 72 * scale, 656 * scale, 8 * scale);
+    ctx.fillRect(52 * scale, 342 * scale, 656 * scale, 8 * scale);
+    ctx.strokeStyle = line;
+    ctx.lineWidth = Math.max(1, 1.5 * scale);
+    ctx.setLineDash([18 * scale, 12 * scale]);
+    ctx.beginPath();
+    ctx.moveTo(68 * scale, 248 * scale);
+    ctx.lineTo(692 * scale, 248 * scale);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.strokeStyle = vars.accent;
+    ctx.lineWidth = Math.max(1, 2 * scale);
+    ctx.strokeRect(300 * scale, 96 * scale, 130 * scale, 64 * scale);
+    ctx.fillStyle = 'rgba(225, 29, 72, .08)';
+    ctx.fillRect(300 * scale, 96 * scale, 130 * scale, 64 * scale);
+  };
+
+  const drawParking = () => {
+    const ctx = parkingCanvas.getContext('2d');
+    const vars = getVars();
+    drawParkingLot(ctx, vars, 1);
+    parkingParkedCars.forEach((parked) => drawParkingRect(ctx, parked, parked.length, parked.width, parked.color, vars.border));
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(56, 189, 248, .28)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([7, 8]);
+    ctx.beginPath();
+    ctx.arc(parkingState.car.x, parkingState.car.y, 58, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    drawParkingRect(
+      ctx,
+      parkingState.car,
+      parkingCarLength,
+      parkingCarWidth,
+      parkingState.car.collided ? '#fb365f' : '#38bdf8',
+      parkingState.car.collided ? '#fff' : '#083344',
+    );
+
+    ctx.save();
+    ctx.translate(parkingTarget.x, parkingTarget.y);
+    ctx.rotate(parkingTarget.angle);
+    ctx.strokeStyle = 'rgba(34, 197, 94, .72)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 6]);
+    roundedRect(ctx, -parkingCarLength / 2, -parkingCarWidth / 2, parkingCarLength, parkingCarWidth, 5);
+    ctx.stroke();
+    ctx.restore();
+
+    drawParkingSensor();
+  };
+
+  const drawParkingSensor = () => {
+    const sourceCanvas = document.createElement('canvas');
+    sourceCanvas.width = 96;
+    sourceCanvas.height = 96;
+    const ctx = sourceCanvas.getContext('2d');
+    const vars = getVars();
+    const scale = 96 / 220;
+    ctx.fillStyle = vars.canvas;
+    ctx.fillRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+    ctx.save();
+    ctx.translate(48, 52);
+    ctx.rotate(-parkingState.car.angle);
+    ctx.translate(-parkingState.car.x * scale, -parkingState.car.y * scale);
+    drawParkingLot(ctx, vars, scale);
+    parkingParkedCars.forEach((parked) => {
+      drawParkingRect(ctx, { ...parked, x: parked.x * scale, y: parked.y * scale }, parked.length * scale, parked.width * scale, '#71717a', vars.border);
+    });
+    drawParkingRect(ctx, { ...parkingTarget, x: parkingTarget.x * scale, y: parkingTarget.y * scale }, parkingCarLength * scale, parkingCarWidth * scale, 'rgba(34, 197, 94, .16)', '#22c55e');
+    drawParkingRect(ctx, { x: parkingState.car.x * scale, y: parkingState.car.y * scale, angle: parkingState.car.angle }, parkingCarLength * scale, parkingCarWidth * scale, '#38bdf8', '#083344');
+    ctx.restore();
+
+    const sensorData = ctx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
+    putImageData(parkingSensor, sensorData);
+    putImageData(parkingDct, compressDct(sensorData, Number(parkingDctKeep.value)).reconstruction);
+  };
+
+  const runParkingFrame = (now) => {
+    if (parkingState.lastFrame === null) parkingState.lastFrame = now;
+    const dt = Math.min((now - parkingState.lastFrame) / 1000, 0.05);
+    parkingState.lastFrame = now;
+    if (!parkingState.paused) stepParking(dt);
+    updateParkingMetrics();
+    drawParking();
+    requestAnimationFrame(runParkingFrame);
+  };
+
+  [parkingMode, parkingDctKeep, parkingSteer, parkingThrottle].forEach((control) => {
+    control.addEventListener('input', updateParkingControls);
+    control.addEventListener('change', updateParkingControls);
+  });
+
+  parkingMode.addEventListener('change', () => {
+    updateParkingControls();
+    updateParkingMetrics();
+  });
+
+  parkingPause.addEventListener('click', () => {
+    parkingState.paused = !parkingState.paused;
+    parkingPause.textContent = parkingState.paused ? 'Resume' : 'Pause';
+    updateParkingMetrics();
+    drawParking();
+  });
+
+  parkingReset.addEventListener('click', () => {
+    const wasPaused = parkingState.paused;
+    resetParking();
+    parkingState.paused = wasPaused;
+    parkingPause.textContent = parkingState.paused ? 'Resume' : 'Pause';
+    updateParkingMetrics();
+    drawParking();
+  });
   const setKnnImage = (image, label) => {
     const sourceWidth = image.naturalWidth || image.width;
     const sourceHeight = image.naturalHeight || image.height;
@@ -1604,6 +1956,7 @@
 
   new MutationObserver(() => {
     drawTraffic();
+    drawParking();
     drawClusters();
     drawConvolution();
   }).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
@@ -1613,6 +1966,11 @@
   updateTrafficMetrics();
   drawTraffic();
   requestAnimationFrame(runTrafficFrame);
+  resetParking();
+  updateParkingControls();
+  updateParkingMetrics();
+  drawParking();
+  requestAnimationFrame(runParkingFrame);
   seedClusterPoints();
   renderKernelGrid();
   resetConvGrid();
