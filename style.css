@@ -724,7 +724,7 @@ a:hover { color: var(--accent-hot); text-decoration: underline; }
 }
 
 .parking-metrics {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .traffic-metrics div,
