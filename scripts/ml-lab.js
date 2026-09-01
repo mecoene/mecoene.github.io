@@ -1802,16 +1802,20 @@
     car.angle = wrapAngle(car.angle + (car.speed / parkingWheelbase) * Math.tan(car.steer) * dt);
   };
 
-  const parkingStepReward = (car, previousDistance, previousAngle, didCollide, didPark) => {
+  const parkingStepReward = (car, previousDistance, previousAngle, previousCenterlinePenalty, didCollide, didPark) => {
     const distance = parkingDistanceForCar(car);
     const angle = parkingAngleErrorForCar(car);
+    const centerlinePenalty = parkingCenterlinePenalty(car);
     const distanceProgress = previousDistance - distance;
     const angleProgress = previousAngle - angle;
+    const sidewalkProgress = previousCenterlinePenalty - centerlinePenalty;
     let reward = distanceProgress * 0.85 + angleProgress * 45;
+    reward += sidewalkProgress * 0.32;
+    reward += clamp(24 - centerlinePenalty * 0.18, 0, 24) * 0.04;
     reward -= distance * 0.01;
     reward -= Math.abs(radiansToDegrees(angle)) * 0.07;
     reward -= Math.abs(car.speed) * 0.012;
-    reward -= parkingCenterlinePenalty(car) * 0.018;
+    reward -= centerlinePenalty * 0.012;
     reward -= 0.35;
     if (didCollide) reward -= 260;
     if (didPark) reward += 520;
@@ -1840,6 +1844,7 @@
     for (; step < maxSteps; step += 1) {
       const previousDistance = parkingDistanceForCar(car);
       const previousAngle = parkingAngleErrorForCar(car);
+      const previousCenterlinePenalty = parkingCenterlinePenalty(car);
       const action = parkingPolicyActionFor(car, policy);
       applyParkingAction(car, action, dt);
 
@@ -1858,7 +1863,7 @@
         car.throttle = 0;
       }
 
-      score += parkingStepReward(car, previousDistance, previousAngle, didCollide, didPark);
+      score += parkingStepReward(car, previousDistance, previousAngle, previousCenterlinePenalty, didCollide, didPark);
       if (didCollide || didPark) break;
     }
 
@@ -1956,6 +1961,7 @@
 
     const previousDistance = parkingDistanceForCar(car);
     const previousAngle = parkingAngleErrorForCar(car);
+    const previousCenterlinePenalty = parkingCenterlinePenalty(car);
     const action = parkingMode.value === 'manual' ? parkingManualAction() : parkingPolicyAction();
     applyParkingAction(car, action, dt);
     parkingState.steps += 1;
@@ -1976,7 +1982,7 @@
       car.throttle = 0;
     }
 
-    const reward = parkingStepReward(car, previousDistance, previousAngle, didCollide, didPark);
+    const reward = parkingStepReward(car, previousDistance, previousAngle, previousCenterlinePenalty, didCollide, didPark);
     parkingState.reward = Math.round(reward);
     parkingState.episodeReward += reward;
   };
