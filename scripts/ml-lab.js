@@ -243,7 +243,7 @@
   const trafficLeaderGap = (vehicle) => {
     let nearest = Infinity;
     trafficState.vehicles.forEach((other) => {
-      if (other === vehicle || other.lane.key !== vehicle.lane.key || other.collided) return;
+      if (other === vehicle || other.lane.key !== vehicle.lane.key) return;
       const delta = vehicle.lane.axis === 'x'
         ? (other.x - vehicle.x) * vehicle.lane.sign
         : (other.y - vehicle.y) * vehicle.lane.sign;
@@ -338,6 +338,20 @@
     if (vehicle.speed < 6 && targetSpeed < 12) vehicle.wait += dt;
   };
 
+  const markTrafficCollision = (first, second, key) => {
+    trafficState.collisions += 1;
+    first.collided = true;
+    second.collided = true;
+    first.crashTimer = Math.max(first.crashTimer, 1.35);
+    second.crashTimer = Math.max(second.crashTimer, 1.35);
+    first.speed = 0;
+    second.speed = 0;
+    first.command = 0;
+    second.command = 0;
+    trafficState.emergencyHold = Math.max(trafficState.emergencyHold, 1.25);
+    trafficState.pairCooldowns.set(key, 1.8);
+  };
+
   const updateTrafficInteractions = (dt) => {
     trafficState.pairCooldowns.forEach((time, key) => {
       const next = time - dt;
@@ -347,13 +361,11 @@
 
     for (let i = 0; i < trafficState.vehicles.length; i += 1) {
       const first = trafficState.vehicles[i];
-      if (first.collided) continue;
       const firstPoint = trafficDisplayPoint(first);
       const firstBounds = trafficVehicleBounds(first);
 
       for (let j = i + 1; j < trafficState.vehicles.length; j += 1) {
         const second = trafficState.vehicles[j];
-        if (second.collided) continue;
         const secondPoint = trafficDisplayPoint(second);
         const secondBounds = trafficVehicleBounds(second);
         const touching = trafficBoxesTouch(firstBounds, secondBounds);
@@ -361,21 +373,18 @@
         if (!touching && distance > 48) continue;
 
         const key = first.id < second.id ? `${first.id}-${second.id}` : `${second.id}-${first.id}`;
-        if (trafficState.pairCooldowns.has(key)) continue;
         const crossing = first.lane.group !== second.lane.group;
         const closeFollowing = first.lane.key === second.lane.key && distance < 28;
+        const alreadyCrashedPair = first.collided && second.collided;
+        const crashing = touching || distance < 20 || (crossing && distance < 24);
 
-        if (touching || distance < 20 || (crossing && distance < 24)) {
-          trafficState.collisions += 1;
-          first.collided = true;
-          second.collided = true;
-          first.crashTimer = 1.35;
-          second.crashTimer = 1.35;
-          first.speed = 0;
-          second.speed = 0;
-          trafficState.emergencyHold = Math.max(trafficState.emergencyHold, 1.25);
-          trafficState.pairCooldowns.set(key, 1.8);
-        } else if (crossing || closeFollowing) {
+        if (crashing && !alreadyCrashedPair) {
+          markTrafficCollision(first, second, key);
+          continue;
+        }
+
+        if (alreadyCrashedPair || first.collided || second.collided || trafficState.pairCooldowns.has(key)) continue;
+        if (crossing || closeFollowing) {
           trafficState.nearMisses += 1;
           if (trafficRecovery.value === 'hold') trafficState.emergencyHold = Math.max(trafficState.emergencyHold, 0.75);
           trafficState.pairCooldowns.set(key, 1.45);
