@@ -1909,7 +1909,7 @@
     const angleProgress = previousAngle - angle;
     const sidewalkProgress = previousCenterlinePenalty - centerlinePenalty;
     let reward = distanceProgress * 0.85 + angleProgress * 45;
-    reward += sidewalkProgress * 0.2;
+    reward += sidewalkProgress * 0.1;
     reward += clamp(24 - centerlinePenalty * 0.18, 0, 24) * 0.04;
     if (!didCollide && sidewalkLead > 0) reward += 28 + clamp(sidewalkLead * 0.85, 0, 42);
     reward -= distance * 0.01;
