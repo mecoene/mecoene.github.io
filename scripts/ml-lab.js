@@ -2324,7 +2324,7 @@
       { x: parkingTarget.x + scenario.gap / 2, y: parkingTarget.y + slotHeight / 2 },
       { x: parkingTarget.x - scenario.gap / 2, y: parkingTarget.y + slotHeight / 2 },
     ];
-    drawParkingPovPolygon(ctx, slotCorners, origin, angle, width, height, 'rgba(34, 197, 94, .1)', scenario.color || vars.accent);
+    
     parkingParkedCars.forEach((parked) => {
       drawParkingPovPolygon(ctx, parkingCarCorners(parked, parked.length, parked.width), origin, angle, width, height, '#71717a', vars.border);
     });
