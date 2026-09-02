@@ -1493,6 +1493,11 @@
   const parkingCarWidth = 32;
   const parkingWheelbase = 48;
   const parkingPovDctBudget = Object.freeze({ keep: 3, total: 24 });
+  const parkingAdjustmentMaxMoves = 3;
+  const parkingAdjustmentTriggerDistance = 24;
+  const parkingAdjustmentTriggerAngle = 0.18;
+  const parkingAdjustmentMoveSeconds = 0.54;
+  const parkingAdjustmentThrottle = 0.16;
   const parkingCloseParkedY = 112;
   const parkingTarget = { x: 365, y: parkingCloseParkedY, angle: 0 };
   const parkingParkedCars = [];
@@ -1558,6 +1563,7 @@
     scenario: null,
     scenarioCount: 0,
     phase: 0,
+    adjustment: null,
     reward: 0,
     episodeReward: 0,
     bestReward: null,
@@ -1578,6 +1584,13 @@
   const wrapAngle = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
   const radiansToDegrees = (angle) => Math.round((angle * 180) / Math.PI);
   const parkingScenarioLabel = () => (parkingState.scenario ? `${parkingState.scenario.label} spot` : 'Parking spot');
+  const createParkingAdjustmentState = () => ({
+    active: false,
+    done: false,
+    moves: 0,
+    timer: 0,
+    direction: -1,
+  });
 
   const pickParkingScenarioType = (previousLabel = '') => {
     const options = previousLabel
@@ -1673,6 +1686,7 @@
 
     parkingState.car = parkingInitialCar();
     parkingState.phase = 0;
+    parkingState.adjustment = createParkingAdjustmentState();
     parkingState.reward = 0;
     parkingState.episodeReward = 0;
     parkingState.collisions = 0;
@@ -1751,8 +1765,68 @@
   const parkingSidewalkLeadBonus = (car) => Math.max(0, parkingParkedCenterY() - car.y);
   const parkingIsParked = (car) => parkingDistanceForCar(car) < 13 && parkingAngleErrorForCar(car) < 0.1;
   const parkingDistanceToTarget = () => parkingDistanceForCar(parkingState.car);
+  const parkingReadyForAdjustment = (car) => (
+    parkingDistanceForCar(car) < parkingAdjustmentTriggerDistance
+    && parkingAngleErrorForCar(car) < parkingAdjustmentTriggerAngle
+  );
 
-  const parkingPolicyActionFor = (car, policy = parkingState.policy) => {
+  const parkingStartAdjustment = (adjustment, car) => {
+    adjustment.active = true;
+    adjustment.done = false;
+    adjustment.moves = 0;
+    adjustment.timer = 0;
+    adjustment.direction = Math.sign(parkingTarget.x - car.x) || (car.speed < 0 ? 1 : -1);
+  };
+
+  const parkingAdjustmentActionFor = (car, adjustment, dt) => {
+    const angleError = wrapAngle(car.angle - parkingTarget.angle);
+    const yError = parkingTarget.y - car.y;
+    const steer = clamp(
+      angleError * 1.55 + yError * 0.026,
+      -0.42,
+      0.42,
+    );
+    const action = {
+      throttle: adjustment.direction * parkingAdjustmentThrottle,
+      steer,
+      phase: 4,
+      parked: false,
+      adjusting: true,
+    };
+    const aligned = adjustment.moves > 0
+      && parkingDistanceForCar(car) < 7
+      && parkingAngleErrorForCar(car) < 0.055;
+    const unsafe = parkingWouldCollideAfterAction(car, action, 0.16);
+
+    adjustment.timer += dt;
+    if (aligned || unsafe || adjustment.timer >= parkingAdjustmentMoveSeconds) {
+      adjustment.moves += 1;
+      adjustment.timer = 0;
+      if (aligned || adjustment.moves >= parkingAdjustmentMaxMoves) {
+        adjustment.active = false;
+        adjustment.done = true;
+        return {
+          throttle: 0,
+          steer: -angleError * 0.65,
+          phase: 4,
+          parked: aligned || parkingIsParked(car),
+          adjusting: false,
+        };
+      }
+      adjustment.direction *= -1;
+      return {
+        throttle: 0,
+        steer,
+        phase: 4,
+        parked: false,
+        adjusting: true,
+      };
+    }
+
+    return action;
+  };
+
+  const parkingPolicyActionFor = (car, policy = parkingState.policy, adjustment = null, dt = 1 / 30) => {
     const distance = parkingDistanceForCar(car);
     const angleError = wrapAngle(car.angle - parkingTarget.angle);
     const phase1X = parkingTarget.x + policy.phase1Offset;
@@ -1762,6 +1836,10 @@
     let steer = 0;
     let phase = 1;
     let parked = false;
+
+    if (adjustment && adjustment.active) {
+      return parkingAdjustmentActionFor(car, adjustment, dt);
+    }
 
     if (car.x > phase1X) {
       phase = 1;
@@ -1773,6 +1851,10 @@
       throttle = policy.phase2Throttle;
     } else {
       phase = 3;
+      if (adjustment && !adjustment.done && parkingReadyForAdjustment(car)) {
+        parkingStartAdjustment(adjustment, car);
+        return parkingAdjustmentActionFor(car, adjustment, dt);
+      }
       throttle = clamp((parkingTarget.x - car.x) * policy.finalThrottleGain, policy.finalMinThrottle, policy.finalMaxThrottle);
       steer = clamp(
         angleError * policy.finalAngleGain + (parkingTarget.y - car.y) * policy.finalYGain,
@@ -1789,8 +1871,8 @@
     return { throttle, steer, phase, parked };
   };
 
-  const parkingPolicyAction = () => {
-    const action = parkingPolicyActionFor(parkingState.car, parkingState.policy);
+  const parkingPolicyAction = (dt) => {
+    const action = parkingPolicyActionFor(parkingState.car, parkingState.policy, parkingState.adjustment, dt);
     parkingState.phase = action.phase;
     if (action.parked) parkingState.parked = true;
     return action;
@@ -1810,6 +1892,12 @@
     car.x += Math.cos(car.angle) * car.speed * dt;
     car.y += Math.sin(car.angle) * car.speed * dt;
     car.angle = wrapAngle(car.angle + (car.speed / parkingWheelbase) * Math.tan(car.steer) * dt);
+  };
+
+  const parkingWouldCollideAfterAction = (car, action, dt) => {
+    const preview = { ...car };
+    applyParkingAction(preview, action, dt);
+    return parkingCollisionForCar(preview);
   };
 
   const parkingStepReward = (car, previousDistance, previousAngle, previousCenterlinePenalty, didCollide, didPark) => {
@@ -1852,12 +1940,13 @@
     let collisions = 0;
     let parked = false;
     let step = 0;
+    const adjustment = createParkingAdjustmentState();
 
     for (; step < maxSteps; step += 1) {
       const previousDistance = parkingDistanceForCar(car);
       const previousAngle = parkingAngleErrorForCar(car);
       const previousCenterlinePenalty = parkingCenterlinePenalty(car);
-      const action = parkingPolicyActionFor(car, policy);
+      const action = parkingPolicyActionFor(car, policy, adjustment, dt);
       applyParkingAction(car, action, dt);
 
       const didCollide = parkingCollisionForCar(car);
@@ -1977,7 +2066,7 @@
     const previousDistance = parkingDistanceForCar(car);
     const previousAngle = parkingAngleErrorForCar(car);
     const previousCenterlinePenalty = parkingCenterlinePenalty(car);
-    const action = parkingMode.value === 'manual' ? parkingManualAction() : parkingPolicyAction();
+    const action = parkingMode.value === 'manual' ? parkingManualAction() : parkingPolicyAction(dt);
     applyParkingAction(car, action, dt);
     parkingState.steps += 1;
 
@@ -2029,6 +2118,10 @@
     if (parkingState.training) parkingStatus.textContent = `Training ${parkingState.trainProgress}/${parkingState.trainGoal} - ${parkingScenarioLabel()}`;
     else if (parkingState.paused) parkingStatus.textContent = `Paused - ${parkingScenarioLabel()}`;
     else if (parkingState.car.collided) parkingStatus.textContent = `Collision - ${parkingScenarioLabel()}`;
+    else if (parkingState.adjustment && parkingState.adjustment.active) {
+      const move = Math.min(parkingAdjustmentMaxMoves, parkingState.adjustment.moves + 1);
+      parkingStatus.textContent = `Adjusting ${move}/${parkingAdjustmentMaxMoves} - ${parkingScenarioLabel()}`;
+    }
     else if (parkingState.parked) {
       const seconds = Math.max(1, Math.ceil(parkingState.nextScenarioCountdown || 0));
       parkingStatus.textContent = `Parked - next spot in ${seconds}s`;
