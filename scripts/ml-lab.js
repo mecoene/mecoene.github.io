@@ -1260,7 +1260,7 @@
   const dctDownload = $('dctDownload');
   const dctStatus = $('dctStatus');
   const maxDctSide = 400;
-  const dctSize = 1;
+  const dctSize = 8;
   const dctAlpha = Array.from({ length: dctSize }, (_, index) => (index === 0 ? Math.SQRT1_2 : 1));
   const dctCos = Array.from({ length: dctSize }, (_, u) => (
     Array.from({ length: dctSize }, (_, x) => Math.cos(((2 * x + 1) * u * Math.PI) / 16))
@@ -1492,7 +1492,7 @@
   const parkingCarLength = 66;
   const parkingCarWidth = 32;
   const parkingWheelbase = 48;
-  const parkingPovDctBudget = Object.freeze({ keep: 3, total: 24 });
+  const parkingPovDctBudget = Object.freeze({ keep: 1, total: 24 });
   const parkingAdjustmentMaxMoves = 3;
   const parkingAdjustmentTriggerDistance = 24;
   const parkingAdjustmentTriggerAngle = 0.18;
