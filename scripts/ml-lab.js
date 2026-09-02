@@ -1492,51 +1492,62 @@
   const parkingCarWidth = 32;
   const parkingWheelbase = 48;
   const parkingTargetZoneHeight = 64;
+  const parkingRoadLeft = 55;
+  const parkingRoadRight = 705;
+  const parkingRoadTop = 125;
+  const parkingRoadBottom = 295;
+  const parkingUpperRowY = 160;
+  const parkingLaneCenterY = 210;
+  const parkingLowerRowY = 260;
+  const parkingParkedLength = 76;
+  const parkingParkedWidth = 34;
+  const parkingApproachMargin = 2;
+  const parkingApproachThrottle = -0.42;
   const parkingAdjustmentMaxMoves = 8;
-  const parkingAdjustmentTriggerDistance = 28;
+  const parkingAdjustmentTriggerDistance = 35;
   const parkingAdjustmentTriggerAngle = 0.62;
   const parkingAdjustmentMoveSeconds = 0.60;
   const parkingAdjustmentThrottle = 0.22;
   const parkingAdjustmentAngleGain = 2.10;
   const parkingAdjustmentLateralGain = 0.032;
   const parkingAdjustmentMaxSteer = (34 * Math.PI) / 180;
-  const parkingCloseParkedY = 112;
+  const parkingCloseParkedY = parkingUpperRowY;
   const parkingTarget = { x: 365, y: parkingCloseParkedY, angle: 0 };
   const parkingParkedCars = [];
   const parkingScenarioTypes = [
-    { label: 'Easy', gapRange: [212, 238], color: '#22c55e', chance: 0.27 },
-    { label: 'Standard', gapRange: [190, 210], color: '#f59e0b', chance: 0.38 },
-    { label: 'Tight', gapRange: [176, 188], color: '#fb365f', chance: 0.35 },
-    { label: 'Super Tight', gapRange: [88, 96], color: '#dc2626', chance: 0 },
+    { label: 'Easy', gapRange: [122, 136], color: '#22c55e', chance: 0.27 },
+    { label: 'Standard', gapRange: [108, 120], color: '#f59e0b', chance: 0.38 },
+    { label: 'Tight', gapRange: [96, 106], color: '#fb365f', chance: 0.35 },
+    { label: 'Super Tight', gapRange: [84, 92], color: '#dc2626', chance: 0 },
   ];
   const parkingDefaultPolicy = Object.freeze({
-    phase1Offset: 129.44,
-    phase2Offset: 72.02,
-    phase2YOffset: 78.9,
-    phase1Steer: -0.32,
-    phase1Throttle: -0.5,
-    phase2Steer: 0.14,
-    phase2Throttle: -0.55,
+    phase1Offset: 58,
+    phase2Offset: 52,
+    phase2YOffset: 18,
+    phase1Steer: -0.5,
+    phase1Throttle: -0.34,
+    phase2Steer: 0.52,
+    phase2Throttle: -0.28,
     finalThrottleGain: 0.024,
     finalMinThrottle: -0.14,
     finalMaxThrottle: 0.29,
     finalAngleGain: 2.03,
     finalYGain: 0.029,
-    finalMaxSteer: 0.49,
+    finalMaxSteer: 0.52,
   });
   const parkingPolicyRanges = {
-    phase1Offset: [105, 190],
-    phase2Offset: [10, 90],
-    phase2YOffset: [18, 96],
-    phase1Steer: [-0.6, -0.2],
-    phase1Throttle: [-0.62, -0.25],
-    phase2Steer: [0.04, 0.48],
-    phase2Throttle: [-0.62, -0.22],
+    phase1Offset: [35, 82],
+    phase2Offset: [30, 85],
+    phase2YOffset: [8, 34],
+    phase1Steer: [-0.6, -0.24],
+    phase1Throttle: [-0.5, -0.2],
+    phase2Steer: [0.18, 0.6],
+    phase2Throttle: [-0.46, -0.16],
     finalThrottleGain: [0.01, 0.034],
     finalMinThrottle: [-0.34, -0.08],
     finalMaxThrottle: [0.08, 0.34],
     finalAngleGain: [0.7, 2.6],
-    finalYGain: [0.004, 0.032],
+    finalYGain: [0.004, 0.04],
     finalMaxSteer: [0.3, 0.58],
   };
   const cloneParkingPolicy = (policy) => ({ ...policy });
@@ -1546,7 +1557,6 @@
     Object.entries(parkingPolicyRanges).forEach(([key, [min, max]]) => {
       next[key] = clamp(next[key], min, max);
     });
-    next.phase2Offset = Math.min(next.phase2Offset, next.phase1Offset - 55);
     return next;
   };
   const sampleParkingPolicy = () => normalizeParkingPolicy(Object.fromEntries(
@@ -1625,38 +1635,41 @@
       targetX,
       targetY: parkingCloseParkedY,
       startX: clamp(targetX + 247, 562, 660),
-      startY: 252,
+      startY: parkingLaneCenterY,
     };
   };
 
   const applyParkingScenario = (scenario, resetPolicy = true) => {
-    const parkedLength = 76;
     parkingState.scenario = scenario;
     parkingState.scenarioCount += 1;
     parkingTarget.x = scenario.targetX;
     parkingTarget.y = scenario.targetY;
     parkingTarget.angle = 0;
     parkingParkedCars.length = 0;
-    const leftClearance = scenario.gap * 0.42;
-    const rightClearance = scenario.gap - leftClearance;
-    parkingParkedCars.push(
-      {
-        x: scenario.targetX - leftClearance - parkedLength / 2,
-        y: scenario.targetY,
+    const leftClearance = scenario.gap / 2;
+    const rightClearance = scenario.gap / 2;
+    const rowMinX = parkingRoadLeft + parkingParkedLength / 2 + 3;
+    const rowMaxX = parkingRoadRight - parkingParkedLength / 2 - 3;
+    const addParkedCar = (x, y, row) => {
+      const colors = row === 'upper' ? ['#71717a', '#62626b'] : ['#686871', '#7b7b84'];
+      parkingParkedCars.push({
+        x,
+        y,
+        row,
         angle: 0,
-        length: parkedLength,
-        width: 34,
-        color: '#71717a',
-      },
-      {
-        x: scenario.targetX + rightClearance + parkedLength / 2,
-        y: scenario.targetY,
-        angle: 0,
-        length: parkedLength,
-        width: 34,
-        color: '#71717a',
-      },
-    );
+        length: parkingParkedLength,
+        width: parkingParkedWidth,
+        color: colors[parkingParkedCars.length % colors.length],
+      });
+    };
+
+    const leftAdjacentX = scenario.targetX - leftClearance - parkingParkedLength / 2;
+    const rightAdjacentX = scenario.targetX + rightClearance + parkingParkedLength / 2;
+    addParkedCar(leftAdjacentX, parkingUpperRowY, 'upper');
+    addParkedCar(rightAdjacentX, parkingUpperRowY, 'upper');
+    for (let x = leftAdjacentX - 86; x >= rowMinX; x -= 86) addParkedCar(x, parkingUpperRowY, 'upper');
+    for (let x = rightAdjacentX + 86; x <= rowMaxX; x += 86) addParkedCar(x, parkingUpperRowY, 'upper');
+    for (let x = rowMinX; x <= rowMaxX; x += 94) addParkedCar(x, parkingLowerRowY, 'lower');
 
     if (resetPolicy) {
       parkingState.policy = cloneParkingPolicy(parkingDefaultPolicy);
@@ -1668,7 +1681,7 @@
 
   const parkingInitialCar = () => ({
     x: parkingState.scenario ? parkingState.scenario.startX : parkingTarget.x + 247,
-    y: parkingState.scenario ? parkingState.scenario.startY : 252,
+    y: parkingState.scenario ? parkingState.scenario.startY : parkingLaneCenterY,
     angle: 0,
     speed: 0,
     steer: 0,
@@ -1748,7 +1761,10 @@
 
   const parkingCollisionForCar = (car) => {
     const carCorners = parkingCarCorners(car);
-    const curbHit = carCorners.some((corner) => corner.y < 78 || corner.y > 342 || corner.x < 55 || corner.x > 705);
+    const curbHit = carCorners.some((corner) => (
+      corner.y < parkingRoadTop || corner.y > parkingRoadBottom
+      || corner.x < parkingRoadLeft || corner.x > parkingRoadRight
+    ));
     const parkedHit = parkingParkedCars.some((parked) => (
       polygonsOverlap(carCorners, parkingCarCorners(parked, parked.length, parked.width))
     ));
@@ -1756,11 +1772,12 @@
   };
 
   const parkingCollision = () => parkingCollisionForCar(parkingState.car);
-  const parkingParkedCenterY = () => (
-    parkingParkedCars.length
-      ? parkingParkedCars.reduce((total, parked) => total + parked.y, 0) / parkingParkedCars.length
-      : parkingTarget.y
-  );
+  const parkingParkedCenterY = () => {
+    const upperRow = parkingParkedCars.filter((parked) => parked.row === 'upper');
+    return upperRow.length
+      ? upperRow.reduce((total, parked) => total + parked.y, 0) / upperRow.length
+      : parkingTarget.y;
+  };
   const parkingDistanceForCar = (car) => Math.hypot(car.x - parkingTarget.x, car.y - parkingTarget.y);
   const parkingAngleErrorForCar = (car) => Math.abs(wrapAngle(car.angle - parkingTarget.angle));
   const parkingCarInsideTargetZone = (car) => {
@@ -1791,6 +1808,8 @@
     adjustment.moves = 0;
     adjustment.timer = 0;
     adjustment.direction = 1;
+    car.speed = 0;
+    car.throttle = 0;
   };
 
   const parkingAdjustmentActionFor = (car, adjustment, dt) => {
@@ -1843,8 +1862,10 @@
   const parkingPolicyActionFor = (car, policy = parkingState.policy, adjustment = null, dt = 1 / 30) => {
     const distance = parkingDistanceForCar(car);
     const angleError = wrapAngle(car.angle - parkingTarget.angle);
-    const phase1X = parkingTarget.x + policy.phase1Offset;
-    const phase2X = parkingTarget.x + policy.phase2Offset;
+    const rightClearance = parkingState.scenario ? parkingState.scenario.gap / 2 : 60;
+    const approachX = parkingTarget.x + rightClearance + parkingCarLength / 2 + parkingApproachMargin;
+    const phase1X = approachX - policy.phase1Offset;
+    const phase2X = phase1X - policy.phase2Offset;
     const phase2Y = parkingTarget.y + policy.phase2YOffset;
     let throttle = -0.55;
     let steer = 0;
@@ -1854,21 +1875,26 @@
     if (adjustment && adjustment.active) {
       return parkingAdjustmentActionFor(car, adjustment, dt);
     }
+    if (adjustment && !adjustment.done && parkingReadyForAdjustment(car)) {
+      parkingStartAdjustment(adjustment, car);
+      return parkingAdjustmentActionFor(car, adjustment, dt);
+    }
 
-    if (car.x > phase1X) {
+    if (car.x > approachX) {
       phase = 1;
+      steer = 0;
+      throttle = parkingApproachThrottle;
+    } else if (car.x > phase1X) {
+      phase = 2;
       steer = policy.phase1Steer;
       throttle = policy.phase1Throttle;
     } else if (car.x > phase2X || car.y > phase2Y) {
-      phase = 2;
+      phase = 3;
       steer = policy.phase2Steer;
       throttle = policy.phase2Throttle;
     } else {
-      phase = 3;
-      if (adjustment && !adjustment.done && parkingReadyForAdjustment(car)) {
-        parkingStartAdjustment(adjustment, car);
-        return parkingAdjustmentActionFor(car, adjustment, dt);
-      }
+      phase = 4;
+
       throttle = clamp((parkingTarget.x - car.x) * policy.finalThrottleGain, policy.finalMinThrottle, policy.finalMaxThrottle);
       steer = clamp(
         angleError * policy.finalAngleGain + (parkingTarget.y - car.y) * policy.finalYGain,
@@ -2197,18 +2223,31 @@
     ctx.fillStyle = vars.canvas;
     ctx.fillRect(0, 0, parkingWidth * scale, parkingHeight * scale);
     ctx.fillStyle = road;
-    ctx.fillRect(52 * scale, 78 * scale, 656 * scale, 264 * scale);
+    ctx.fillRect(
+      parkingRoadLeft * scale,
+      parkingRoadTop * scale,
+      (parkingRoadRight - parkingRoadLeft) * scale,
+      (parkingRoadBottom - parkingRoadTop) * scale,
+    );
     ctx.fillStyle = curb;
-    ctx.fillRect(52 * scale, 72 * scale, 656 * scale, 8 * scale);
-    ctx.fillRect(52 * scale, 342 * scale, 656 * scale, 8 * scale);
+    ctx.fillRect(parkingRoadLeft * scale, (parkingRoadTop - 8) * scale, (parkingRoadRight - parkingRoadLeft) * scale, 8 * scale);
+    ctx.fillRect(parkingRoadLeft * scale, parkingRoadBottom * scale, (parkingRoadRight - parkingRoadLeft) * scale, 8 * scale);
     ctx.strokeStyle = line;
-    ctx.lineWidth = Math.max(1, 1.5 * scale);
-    ctx.setLineDash([18 * scale, 12 * scale]);
-    ctx.beginPath();
-    ctx.moveTo(68 * scale, 248 * scale);
-    ctx.lineTo(692 * scale, 248 * scale);
-    ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.fillStyle = line;
+    ctx.lineWidth = Math.max(1, 2 * scale);
+    [220, 365, 510].forEach((x) => {
+      const centerX = x * scale;
+      const centerY = parkingLaneCenterY * scale;
+      const halfLength = 18 * scale;
+      const head = 8 * scale;
+      ctx.beginPath();
+      ctx.moveTo(centerX - halfLength, centerY);
+      ctx.lineTo(centerX + halfLength, centerY);
+      ctx.lineTo(centerX + halfLength - head, centerY - head);
+      ctx.moveTo(centerX + halfLength, centerY);
+      ctx.lineTo(centerX + halfLength - head, centerY + head);
+      ctx.stroke();
+    });
 
     ctx.strokeStyle = scenario.color || vars.accent;
     ctx.lineWidth = Math.max(1, 2 * scale);
@@ -2339,12 +2378,8 @@
 
     ctx.lineWidth = 2;
     ctx.strokeStyle = isLight ? '#c6c9cf' : '#343038';
-    drawParkingPovLine(ctx, [{ x: 54, y: 78 }, { x: 706, y: 78 }], origin, angle, width, height);
-    drawParkingPovLine(ctx, [{ x: 54, y: 342 }, { x: 706, y: 342 }], origin, angle, width, height);
-    ctx.setLineDash([7, 6]);
-    ctx.strokeStyle = isLight ? 'rgba(17, 17, 17, .25)' : 'rgba(255, 255, 255, .22)';
-    drawParkingPovLine(ctx, [{ x: 64, y: 248 }, { x: 696, y: 248 }], origin, angle, width, height);
-    ctx.setLineDash([]);
+    drawParkingPovLine(ctx, [{ x: parkingRoadLeft, y: parkingRoadTop }, { x: parkingRoadRight, y: parkingRoadTop }], origin, angle, width, height);
+    drawParkingPovLine(ctx, [{ x: parkingRoadLeft, y: parkingRoadBottom }, { x: parkingRoadRight, y: parkingRoadBottom }], origin, angle, width, height);
 
     const scenario = parkingState.scenario || { gap: 190, color: vars.accent };
     const slotHeight = parkingTargetZoneHeight;
