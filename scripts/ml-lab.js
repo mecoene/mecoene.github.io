@@ -1473,6 +1473,7 @@
   const parkingTrainValue = $('parkingTrainValue');
   const parkingSteer = $('parkingSteer');
   const parkingSteerValue = $('parkingSteerValue');
+  const parkingSteeringWheel = $('parkingSteeringWheel');
   const parkingThrottle = $('parkingThrottle');
   const parkingThrottleValue = $('parkingThrottleValue');
   const parkingTrain = $('parkingTrain');
@@ -2075,8 +2076,10 @@
   };
 
   const updateParkingControls = () => {
+    const steeringDegrees = Number(parkingSteer.value);
     parkingTrainValue.value = parkingTrainEpisodes.value;
-    parkingSteerValue.value = `${parkingSteer.value} deg`;
+    parkingSteerValue.value = `${Math.round(steeringDegrees)} deg`;
+    parkingSteeringWheel.style.setProperty('--parking-wheel-angle', `${steeringDegrees * 8}deg`);
     parkingThrottleValue.value = `${parkingThrottle.value}%`;
     const manual = parkingMode.value === 'manual';
     parkingSteer.disabled = !manual || parkingState.training;

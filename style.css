@@ -805,6 +805,88 @@ a:hover { color: var(--accent-hot); text-decoration: underline; }
   cursor: grabbing;
 }
 
+.parking-steering-control {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 6.5rem;
+  height: 6.5rem;
+  justify-self: center;
+}
+
+.parking-steer-input {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100% !important;
+  height: 100%;
+  opacity: 0;
+  cursor: grab;
+}
+
+.parking-steer-input:active {
+  cursor: grabbing;
+}
+
+.parking-steer-input:disabled {
+  cursor: default;
+}
+
+.parking-steering-wheel {
+  --parking-wheel-angle: 0deg;
+  position: relative;
+  width: 5.35rem;
+  height: 5.35rem;
+  border: 0.52rem solid var(--copy-soft);
+  border-radius: 50%;
+  background: var(--control-bg);
+  box-shadow: 0 0 0 1px var(--border), inset 0 0 0 2px var(--border), 0 0.55rem 1.25rem rgba(0, 0, 0, 0.16);
+  transform: rotate(var(--parking-wheel-angle));
+  transition: transform 0.22s cubic-bezier(0.22, 0.78, 0.24, 1), border-color 0.15s, background 0.15s;
+  will-change: transform;
+}
+
+.parking-wheel-spoke {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2rem;
+  height: 0.42rem;
+  border-radius: 2px;
+  background: var(--copy-soft);
+  transform-origin: 0 50%;
+}
+
+.parking-wheel-spoke-left {
+  transform: translateY(-50%) rotate(155deg);
+}
+
+.parking-wheel-spoke-right {
+  transform: translateY(-50%) rotate(25deg);
+}
+
+.parking-wheel-spoke-lower {
+  transform: translateY(-50%) rotate(90deg);
+}
+
+.parking-wheel-hub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1.65rem;
+  height: 1.45rem;
+  border: 2px solid var(--accent-hot);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0.28rem var(--control-bg);
+  transform: translate(-50%, -50%);
+}
+
+.parking-steer-input:focus-visible + .parking-steering-wheel {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 5px;
+}
+
 .lab-button-row {
   display: flex;
   gap: 0.5rem;

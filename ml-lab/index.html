@@ -188,9 +188,17 @@
               <input id="parkingTrainEpisodes" type="range" min="20" max="140" step="10" value="60" />
             </label>
 
-            <label class="lab-field">
+            <label class="lab-field parking-steering-field">
               <span>Steering <output id="parkingSteerValue">0 deg</output></span>
-              <input id="parkingSteer" type="range" min="-35" max="35" value="0" />
+              <div class="parking-steering-control">
+                <input class="parking-steer-input" id="parkingSteer" type="range" min="-35" max="35" value="0" aria-label="Steering angle" />
+                <div class="parking-steering-wheel" id="parkingSteeringWheel" aria-hidden="true">
+                  <i class="parking-wheel-spoke parking-wheel-spoke-left"></i>
+                  <i class="parking-wheel-spoke parking-wheel-spoke-right"></i>
+                  <i class="parking-wheel-spoke parking-wheel-spoke-lower"></i>
+                  <i class="parking-wheel-hub"></i>
+                </div>
+              </div>
             </label>
             <label class="lab-field">
               <span>Throttle <output id="parkingThrottleValue">0%</output></span>
