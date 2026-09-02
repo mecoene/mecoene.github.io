@@ -1494,9 +1494,9 @@
   const parkingWheelbase = 48;
   const parkingTargetZoneHeight = 64;
   const parkingPovDctBudget = Object.freeze({ keep: 6, total: 24 });
-  const parkingAdjustmentMaxMoves = 4;
+  const parkingAdjustmentMaxMoves = 8;
   const parkingAdjustmentTriggerDistance = 28;
-  const parkingAdjustmentTriggerAngle = 0.16;
+  const parkingAdjustmentTriggerAngle = 0.62;
   const parkingAdjustmentMoveSeconds = 0.60;
   const parkingAdjustmentThrottle = 0.22;
   const parkingAdjustmentAngleGain = 2.10;
@@ -1792,17 +1792,16 @@
     adjustment.done = false;
     adjustment.moves = 0;
     adjustment.timer = 0;
-    adjustment.direction = Math.sign(parkingTarget.x - car.x) || (car.speed < 0 ? 1 : -1);
+    adjustment.direction = 1;
   };
 
   const parkingAdjustmentActionFor = (car, adjustment, dt) => {
     const angleError = wrapAngle(car.angle - parkingTarget.angle);
     const yError = parkingTarget.y - car.y;
-    const steer = clamp(
-      angleError * parkingAdjustmentAngleGain + yError * parkingAdjustmentLateralGain,
-      -parkingAdjustmentMaxSteer,
-      parkingAdjustmentMaxSteer,
-    );
+    const correction = angleError * parkingAdjustmentAngleGain + yError * parkingAdjustmentLateralGain;
+    const steer = Math.abs(correction) < 0.01
+      ? 0
+      : -adjustment.direction * Math.sign(correction) * parkingAdjustmentMaxSteer;
     const action = {
       throttle: adjustment.direction * parkingAdjustmentThrottle,
       steer,
