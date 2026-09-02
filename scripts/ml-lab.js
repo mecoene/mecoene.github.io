@@ -1476,6 +1476,7 @@
   const parkingThrottle = $('parkingThrottle');
   const parkingThrottleValue = $('parkingThrottleValue');
   const parkingTrain = $('parkingTrain');
+  const parkingSuperTight = $('parkingSuperTight');
   const parkingPause = $('parkingPause');
   const parkingReset = $('parkingReset');
   const parkingStatus = $('parkingStatus');
@@ -1492,41 +1493,43 @@
   const parkingCarWidth = 32;
   const parkingWheelbase = 48;
   const parkingPovDctBudget = Object.freeze({ keep: 3, total: 24 });
-  const parkingTarget = { x: 365, y: 128, angle: 0 };
+  const parkingCloseParkedY = 112;
+  const parkingTarget = { x: 365, y: parkingCloseParkedY, angle: 0 };
   const parkingParkedCars = [];
   const parkingScenarioTypes = [
-    { label: 'Easy', gapRange: [212, 238], color: '#22c55e', chance: 0.3 },
-    { label: 'Standard', gapRange: [190, 210], color: '#f59e0b', chance: 0.45 },
-    { label: 'Tight', gapRange: [180, 188], color: '#fb365f', chance: 0.25 },
+    { label: 'Easy', gapRange: [212, 238], color: '#22c55e', chance: 0.27 },
+    { label: 'Standard', gapRange: [190, 210], color: '#f59e0b', chance: 0.38 },
+    { label: 'Tight', gapRange: [176, 188], color: '#fb365f', chance: 0.35 },
+    { label: 'Super Tight', gapRange: [88, 96], color: '#dc2626', chance: 0 },
   ];
   const parkingDefaultPolicy = Object.freeze({
-    phase1Offset: 155,
-    phase2Offset: 45,
-    phase2YOffset: 17,
-    phase1Steer: -0.38,
-    phase1Throttle: -0.45,
-    phase2Steer: 0.24,
-    phase2Throttle: -0.38,
-    finalThrottleGain: 0.018,
-    finalMinThrottle: -0.22,
-    finalMaxThrottle: 0.24,
-    finalAngleGain: 1.4,
-    finalYGain: 0.008,
-    finalMaxSteer: 0.45,
+    phase1Offset: 129.44,
+    phase2Offset: 72.02,
+    phase2YOffset: 78.9,
+    phase1Steer: -0.32,
+    phase1Throttle: -0.5,
+    phase2Steer: 0.14,
+    phase2Throttle: -0.55,
+    finalThrottleGain: 0.024,
+    finalMinThrottle: -0.14,
+    finalMaxThrottle: 0.29,
+    finalAngleGain: 2.03,
+    finalYGain: 0.029,
+    finalMaxSteer: 0.49,
   });
   const parkingPolicyRanges = {
-    phase1Offset: [120, 205],
-    phase2Offset: [10, 85],
-    phase2YOffset: [6, 34],
-    phase1Steer: [-0.55, -0.24],
-    phase1Throttle: [-0.62, -0.32],
-    phase2Steer: [0.1, 0.45],
-    phase2Throttle: [-0.55, -0.24],
-    finalThrottleGain: [0.01, 0.028],
-    finalMinThrottle: [-0.34, -0.12],
-    finalMaxThrottle: [0.12, 0.34],
-    finalAngleGain: [0.7, 2.1],
-    finalYGain: [0.003, 0.016],
+    phase1Offset: [105, 190],
+    phase2Offset: [10, 90],
+    phase2YOffset: [18, 96],
+    phase1Steer: [-0.6, -0.2],
+    phase1Throttle: [-0.62, -0.25],
+    phase2Steer: [0.04, 0.48],
+    phase2Throttle: [-0.62, -0.22],
+    finalThrottleGain: [0.01, 0.034],
+    finalMinThrottle: [-0.34, -0.08],
+    finalMaxThrottle: [0.08, 0.34],
+    finalAngleGain: [0.7, 2.6],
+    finalYGain: [0.004, 0.032],
     finalMaxSteer: [0.3, 0.58],
   };
   const cloneParkingPolicy = (policy) => ({ ...policy });
@@ -1590,8 +1593,9 @@
     return options[0] || parkingScenarioTypes[1];
   };
 
-  const createParkingScenario = () => {
-    const type = pickParkingScenarioType(parkingState.scenario && parkingState.scenario.label);
+  const createParkingScenario = (forcedLabel = '') => {
+    const forcedType = forcedLabel && parkingScenarioTypes.find((type) => type.label === forcedLabel);
+    const type = forcedType || pickParkingScenarioType(parkingState.scenario && parkingState.scenario.label);
     const gap = Math.round(randomRange(type.gapRange));
     let targetX = Math.round(randomRange([315, 410]));
     if (parkingState.scenario && Math.abs(targetX - parkingState.scenario.targetX) < 28) {
@@ -1604,7 +1608,7 @@
       gap,
       color: type.color,
       targetX,
-      targetY: 128,
+      targetY: parkingCloseParkedY,
       startX: clamp(targetX + 247, 562, 660),
       startY: 252,
     };
@@ -1657,9 +1661,9 @@
     collided: false,
   });
 
-  const resetParking = ({ newScenario = false, resetPolicy = false } = {}) => {
+  const resetParking = ({ newScenario = false, resetPolicy = false, scenarioType = '' } = {}) => {
     if (newScenario || !parkingState.scenario) {
-      applyParkingScenario(createParkingScenario(), true);
+      applyParkingScenario(createParkingScenario(scenarioType), true);
     } else if (resetPolicy) {
       parkingState.policy = cloneParkingPolicy(parkingDefaultPolicy);
       parkingState.bestPolicy = cloneParkingPolicy(parkingDefaultPolicy);
@@ -1958,6 +1962,7 @@
     parkingTrainEpisodes.disabled = parkingState.training;
     parkingMode.disabled = parkingState.training;
     parkingTrain.disabled = parkingState.training;
+    parkingSuperTight.disabled = parkingState.training;
     parkingPause.disabled = parkingState.training;
     parkingReset.disabled = parkingState.training;
   };
@@ -2271,6 +2276,16 @@
   });
 
   parkingTrain.addEventListener('click', trainParkingPolicy);
+
+  parkingSuperTight.addEventListener('click', () => {
+    const wasPaused = parkingState.paused;
+    resetParking({ newScenario: true, scenarioType: 'Super Tight' });
+    parkingState.paused = wasPaused;
+    parkingPause.textContent = parkingState.paused ? 'Resume' : 'Pause';
+    updateParkingControls();
+    updateParkingMetrics();
+    drawParking();
+  });
 
   parkingPause.addEventListener('click', () => {
     parkingState.paused = !parkingState.paused;
