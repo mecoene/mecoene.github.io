@@ -2324,16 +2324,7 @@
       { x: parkingTarget.x + scenario.gap / 2, y: parkingTarget.y + slotHeight / 2 },
       { x: parkingTarget.x - scenario.gap / 2, y: parkingTarget.y + slotHeight / 2 },
     ];
-    drawParkingPovPolygon(ctx, slotCorners, origin, angle, width, height, 'rgba(34, 197, 94, .1)', scenario.color || vars.accent);
-    parkingParkedCars.forEach((parked) => {
-      drawParkingPovPolygon(ctx, parkingCarCorners(parked, parked.length, parked.width), origin, angle, width, height, '#71717a', vars.border);
-    });
 
-    ctx.fillStyle = reverse ? '#fb365f' : '#38bdf8';
-    roundedRect(ctx, width / 2 - 22, height - 13, 44, 10, 3);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255, 255, 255, .74)';
-    ctx.fillRect(width / 2 - 2, height - 18, 4, 12);
 
     const sensorData = ctx.getImageData(0, 0, width, height);
     putImageData(sensorCanvas, sensorData);
