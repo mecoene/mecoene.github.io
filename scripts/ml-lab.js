@@ -1465,9 +1465,7 @@
 
   const parkingCanvas = $('parkingCanvas');
   const parkingFrontSensor = $('parkingFrontSensor');
-  const parkingFrontDct = $('parkingFrontDct');
   const parkingRearSensor = $('parkingRearSensor');
-  const parkingRearDct = $('parkingRearDct');
   const parkingMode = $('parkingMode');
   const parkingTrainEpisodes = $('parkingTrainEpisodes');
   const parkingTrainValue = $('parkingTrainValue');
@@ -1494,7 +1492,6 @@
   const parkingCarWidth = 32;
   const parkingWheelbase = 48;
   const parkingTargetZoneHeight = 64;
-  const parkingPovDctBudget = Object.freeze({ keep: 6, total: 24 });
   const parkingAdjustmentMaxMoves = 8;
   const parkingAdjustmentTriggerDistance = 28;
   const parkingAdjustmentTriggerAngle = 0.62;
@@ -2306,13 +2303,10 @@
     ctx.stroke();
   };
 
-  const drawParkingPov = (sensorCanvas, dctCanvas, reverse = false) => {
-    const sourceCanvas = document.createElement('canvas');
-    sourceCanvas.width = 128;
-    sourceCanvas.height = 96;
-    const ctx = sourceCanvas.getContext('2d');
-    const width = sourceCanvas.width;
-    const height = sourceCanvas.height;
+  const drawParkingPov = (sensorCanvas, reverse = false) => {
+    const ctx = sensorCanvas.getContext('2d');
+    const width = sensorCanvas.width;
+    const height = sensorCanvas.height;
     const vars = getVars();
     const isLight = root.dataset.theme === 'light';
     const car = parkingState.car;
@@ -2364,17 +2358,11 @@
     parkingParkedCars.forEach((parked) => {
       drawParkingPovPolygon(ctx, parkingCarCorners(parked, parked.length, parked.width), origin, angle, width, height, '#71717a', vars.border);
     });
-
-
-
-    const sensorData = ctx.getImageData(0, 0, width, height);
-    putImageData(sensorCanvas, sensorData);
-    putImageData(dctCanvas, compressDct(sensorData, parkingPovDctBudget.keep).error);
   };
 
   const drawParkingSensors = () => {
-    drawParkingPov(parkingFrontSensor, parkingFrontDct, false);
-    drawParkingPov(parkingRearSensor, parkingRearDct, true);
+    drawParkingPov(parkingFrontSensor, false);
+    drawParkingPov(parkingRearSensor, true);
   };
 
   const runParkingFrame = (now) => {
