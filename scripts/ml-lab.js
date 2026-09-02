@@ -1736,9 +1736,15 @@
   };
 
   const parkingCollision = () => parkingCollisionForCar(parkingState.car);
+  const parkingParkedCenterY = () => (
+    parkingParkedCars.length
+      ? parkingParkedCars.reduce((total, parked) => total + parked.y, 0) / parkingParkedCars.length
+      : parkingTarget.y
+  );
   const parkingDistanceForCar = (car) => Math.hypot(car.x - parkingTarget.x, car.y - parkingTarget.y);
   const parkingAngleErrorForCar = (car) => Math.abs(wrapAngle(car.angle - parkingTarget.angle));
-  const parkingCenterlinePenalty = (car) => Math.max(0, car.y - parkingTarget.y);
+  const parkingCenterlinePenalty = (car) => Math.max(0, car.y - parkingParkedCenterY());
+  const parkingSidewalkLeadBonus = (car) => Math.max(0, parkingParkedCenterY() - car.y);
   const parkingIsParked = (car) => parkingDistanceForCar(car) < 13 && parkingAngleErrorForCar(car) < 0.1;
   const parkingDistanceToTarget = () => parkingDistanceForCar(parkingState.car);
 
@@ -1806,12 +1812,14 @@
     const distance = parkingDistanceForCar(car);
     const angle = parkingAngleErrorForCar(car);
     const centerlinePenalty = parkingCenterlinePenalty(car);
+    const sidewalkLead = parkingSidewalkLeadBonus(car);
     const distanceProgress = previousDistance - distance;
     const angleProgress = previousAngle - angle;
     const sidewalkProgress = previousCenterlinePenalty - centerlinePenalty;
     let reward = distanceProgress * 0.85 + angleProgress * 45;
     reward += sidewalkProgress * 0.32;
     reward += clamp(24 - centerlinePenalty * 0.18, 0, 24) * 0.04;
+    if (!didCollide && sidewalkLead > 0) reward += 28 + clamp(sidewalkLead * 0.85, 0, 42);
     reward -= distance * 0.01;
     reward -= Math.abs(radiansToDegrees(angle)) * 0.07;
     reward -= Math.abs(car.speed) * 0.012;
@@ -1869,7 +1877,9 @@
 
     const distance = parkingDistanceForCar(car);
     const angle = parkingAngleErrorForCar(car);
+    const sidewalkLead = parkingSidewalkLeadBonus(car);
     score += clamp(160 - distance * 0.75 - Math.abs(radiansToDegrees(angle)) * 1.8 - parkingCenterlinePenalty(car) * 0.55, -180, 160);
+    if (!collisions && sidewalkLead > 0) score += clamp(70 + sidewalkLead * 1.2, 0, 118);
     score += parked ? 80 : -40;
     score -= collisions * 120;
     return { score, policy, parked, collisions, distance, angle, steps: step + 1 };
