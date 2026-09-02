@@ -1498,6 +1498,9 @@
   const parkingAdjustmentTriggerAngle = 0.18;
   const parkingAdjustmentMoveSeconds = 0.75;
   const parkingAdjustmentThrottle = 0.35;
+  const parkingAdjustmentAngleGain = 2.25;
+  const parkingAdjustmentLateralGain = 0.04;
+  const parkingAdjustmentMaxSteer = (34 * Math.PI) / 180;
   const parkingCloseParkedY = 112;
   const parkingTarget = { x: 365, y: parkingCloseParkedY, angle: 0 };
   const parkingParkedCars = [];
@@ -1782,9 +1785,9 @@
     const angleError = wrapAngle(car.angle - parkingTarget.angle);
     const yError = parkingTarget.y - car.y;
     const steer = clamp(
-      angleError * 1.55 + yError * 0.026,
-      -0.42,
-      0.42,
+      angleError * parkingAdjustmentAngleGain + yError * parkingAdjustmentLateralGain,
+      -parkingAdjustmentMaxSteer,
+      parkingAdjustmentMaxSteer,
     );
     const action = {
       throttle: adjustment.direction * parkingAdjustmentThrottle,
