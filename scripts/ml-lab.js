@@ -1492,6 +1492,7 @@
   const parkingCarLength = 66;
   const parkingCarWidth = 32;
   const parkingWheelbase = 48;
+  const parkingTargetZoneHeight = 64;
   const parkingPovDctBudget = Object.freeze({ keep: 6, total: 24 });
   const parkingAdjustmentMaxMoves = 4;
   const parkingAdjustmentTriggerDistance = 28;
@@ -1764,6 +1765,19 @@
   );
   const parkingDistanceForCar = (car) => Math.hypot(car.x - parkingTarget.x, car.y - parkingTarget.y);
   const parkingAngleErrorForCar = (car) => Math.abs(wrapAngle(car.angle - parkingTarget.angle));
+  const parkingCarInsideTargetZone = (car) => {
+    const halfLength = ((parkingState.scenario && parkingState.scenario.gap) || 130) / 2;
+    const halfHeight = parkingTargetZoneHeight / 2;
+    const cos = Math.cos(parkingTarget.angle);
+    const sin = Math.sin(parkingTarget.angle);
+    return parkingCarCorners(car).every((corner) => {
+      const dx = corner.x - parkingTarget.x;
+      const dy = corner.y - parkingTarget.y;
+      const localX = dx * cos + dy * sin;
+      const localY = -dx * sin + dy * cos;
+      return Math.abs(localX) <= halfLength && Math.abs(localY) <= halfHeight;
+    });
+  };
   const parkingCenterlinePenalty = (car) => Math.max(0, car.y - parkingParkedCenterY());
   const parkingSidewalkLeadBonus = (car) => Math.max(0, parkingParkedCenterY() - car.y);
   const parkingIsParked = (car) => parkingDistanceForCar(car) < 13 && parkingAngleErrorForCar(car) < 0.1;
@@ -1912,14 +1926,21 @@
     const angleProgress = previousAngle - angle;
     const sidewalkProgress = previousCenterlinePenalty - centerlinePenalty;
     const horizontalAlignment = clamp(1 - Math.abs(radiansToDegrees(angle)) / 20, 0, 1);
-    const alignmentRelevance = clamp(1 - distance / 100, 0.2, 1);
-    let reward = distanceProgress * 0.85 + angleProgress * 45;
-    reward += sidewalkProgress * 0.1;
-    reward += alignmentRelevance * (
-      horizontalAlignment * 1.35 - (1 - horizontalAlignment) * 0.3
-    );
-    reward += clamp(24 - centerlinePenalty * 0.18, 0, 24) * 0.04;
-    if (!didCollide && sidewalkLead > 0) reward += 28 + clamp(sidewalkLead * 0.85, 0, 42);
+    const insideTargetZone = parkingCarInsideTargetZone(car);
+    let reward = distanceProgress * 0.85;
+
+    if (insideTargetZone) {
+      reward += angleProgress * 45;
+      reward += sidewalkProgress * 0.1;
+      reward += horizontalAlignment * 1.35 - (1 - horizontalAlignment) * 0.3;
+      reward += clamp(24 - centerlinePenalty * 0.18, 0, 24) * 0.04;
+      if (!didCollide && sidewalkLead > 0) reward += 28 + clamp(sidewalkLead * 0.85, 0, 42);
+    } else {
+      reward += Math.min(0, angleProgress * 45);
+      reward += Math.min(0, sidewalkProgress * 0.1);
+      reward -= 0.45 + (1 - horizontalAlignment) * 0.35;
+    }
+
     reward -= distance * 0.01;
     reward -= Math.abs(car.speed) * 0.012;
     reward -= centerlinePenalty * 0.012;
@@ -1978,8 +1999,14 @@
     const distance = parkingDistanceForCar(car);
     const angle = parkingAngleErrorForCar(car);
     const sidewalkLead = parkingSidewalkLeadBonus(car);
-    score += clamp(160 - distance * 0.75 - Math.abs(radiansToDegrees(angle)) * 1.8 - parkingCenterlinePenalty(car) * 0.55, -180, 160);
-    if (!collisions && sidewalkLead > 0) score += clamp(70 + sidewalkLead * 1.2, 0, 118);
+    const insideTargetZone = parkingCarInsideTargetZone(car);
+    score += clamp(80 - distance * 0.75, -180, 80);
+    if (insideTargetZone) {
+      score += clamp(80 - Math.abs(radiansToDegrees(angle)) * 1.8 - parkingCenterlinePenalty(car) * 0.55, -100, 80);
+      if (!collisions && sidewalkLead > 0) score += clamp(70 + sidewalkLead * 1.2, 0, 118);
+    } else {
+      score -= 25 + Math.abs(radiansToDegrees(angle)) * 0.4;
+    }
     score += parked ? 80 : -40;
     score -= collisions * 120;
     return { score, policy, parked, collisions, distance, angle, steps: step + 1 };
@@ -2165,7 +2192,7 @@
     const line = isLight ? 'rgba(17, 17, 17, .24)' : 'rgba(255, 255, 255, .2)';
     const scenario = parkingState.scenario || { gap: 130, color: vars.accent };
     const slotLength = scenario.gap;
-    const slotHeight = 64;
+    const slotHeight = parkingTargetZoneHeight;
     const slotX = parkingTarget.x - slotLength / 2;
     const slotY = parkingTarget.y - slotHeight / 2;
     ctx.fillStyle = vars.canvas;
@@ -2324,7 +2351,7 @@
     ctx.setLineDash([]);
 
     const scenario = parkingState.scenario || { gap: 190, color: vars.accent };
-    const slotHeight = 64;
+    const slotHeight = parkingTargetZoneHeight;
     const slotCorners = [
       { x: parkingTarget.x - scenario.gap / 2, y: parkingTarget.y - slotHeight / 2 },
       { x: parkingTarget.x + scenario.gap / 2, y: parkingTarget.y - slotHeight / 2 },
