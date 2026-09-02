@@ -1494,10 +1494,10 @@
   const parkingWheelbase = 48;
   const parkingPovDctBudget = Object.freeze({ keep: 6, total: 24 });
   const parkingAdjustmentMaxMoves = 5;
-  const parkingAdjustmentTriggerDistance = 24;
+  const parkingAdjustmentTriggerDistance = 30;
   const parkingAdjustmentTriggerAngle = 0.18;
-  const parkingAdjustmentMoveSeconds = 0.54;
-  const parkingAdjustmentThrottle = 0.25;
+  const parkingAdjustmentMoveSeconds = 0.75;
+  const parkingAdjustmentThrottle = 0.35;
   const parkingCloseParkedY = 112;
   const parkingTarget = { x: 365, y: parkingCloseParkedY, angle: 0 };
   const parkingParkedCars = [];
